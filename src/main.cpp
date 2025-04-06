@@ -18,20 +18,11 @@ int main(void) {
     exit(1);
   }
 
-  struct ifreq ifr;
-  memset(&ifr, 0, sizeof(ifr));
-
-  const char *device_name = "toad";
+  struct ifreq ifr = {0};
+  char device_name[IFNAMSIZ] = "toad";
   strncpy(ifr.ifr_name, device_name, IFNAMSIZ);
 
-  ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-
-  struct sockaddr_in *addr = (struct sockaddr_in *)&ifr.ifr_addr;
-  addr->sin_family = AF_INET;
-  if (inet_pton(AF_INET, "10.0.0.1", &addr->sin_addr) <= 0) {
-    perror("Invalid IP address");
-    return -1;
-  }
+  ifr.ifr_flags = IFF_TUN;
 
   if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
     perror("ioctl(TUNSETIFF)");
@@ -48,8 +39,6 @@ int main(void) {
       close(fd);
       exit(1);
     }
-
-    printf("Received %d bytes\n", nbytes);
 
     for (int i = 0; i < (nbytes > 16 ? 16 : nbytes); i++)
       printf("%02X ", buffer[i]);
