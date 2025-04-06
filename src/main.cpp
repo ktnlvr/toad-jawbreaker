@@ -40,8 +40,7 @@ int main(void) {
       exit(1);
     }
 
-    for (int i = 0; i < (nbytes > 16 ? 16 : nbytes); i++)
-      printf("%02X ", buffer[i]);
-    printf("\n");
+    for (int i = 0; i < nbytes; i++) printf("%02X ", buffer[i] & 0xFF);
+    printf("\n\n");
   }
 }

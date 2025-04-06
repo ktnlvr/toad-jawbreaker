@@ -7,5 +7,5 @@ setup:
 	ip address add dev toad local 10.0.0.5
 	ip route add dev toad 10.0.0.0/24
 
-test_ping:
-	sudo ping 10.0.0.1
+ping:
+	sudo ping 10.0.0.1 -v
