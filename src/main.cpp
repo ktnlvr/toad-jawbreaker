@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "./protocols/arp.hpp"
 #include "./protocols/ethernet.hpp"
 #include "./protocols/ethertype.hpp"
 
@@ -47,6 +48,9 @@ int main(void) {
     for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_dst[i]);
     printf("\nMAC SRC: ");
     for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_src[i]);
+    printf("\nDATA:");
+    for (int i = 0; i < ethernet_frame.length; i++)
+      printf("%02X ", ethernet_frame.buffer[i]);
     printf("\n");
 
     if (nbytes < 0) {
