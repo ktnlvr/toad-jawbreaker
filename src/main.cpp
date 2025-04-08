@@ -35,29 +35,18 @@ int main(void) {
     exit(1);
   }
 
-  char* buffer = (char*)malloc(0xFFFF);
+  byte* buffer = (byte*)malloc(0xFFFF);
   while (1) {
-    char tapbuffer[4];
-    sz nbytes = read(fd, tapbuffer, 4);
+    EthernetFrame ethernet_frame;
+    sz nbytes = read(fd, buffer, 0xFFFF);
 
-    EtherType ethtype = (EtherType)(ntohs(*(uint16_t*)tapbuffer) & 0xFFFF);
-    printf("%04hx\n", ethtype);
+    // Skip first 4 bytes for the EtherType coming from TUN/TAP
+    buffer_to_ethernet(buffer + 4, nbytes - 4, &ethernet_frame);
 
-    EthernetHeader header;
-
-    nbytes = read(fd, buffer, 0xFFFF);
-
-    sz off = 4;
-    for (int i = 0; i < 6; i++) header.mac_dst[i] = buffer[off + i];
-    off = 10;
-    for (int i = 0; i < 6; i++) header.mac_src[i] = buffer[off + i];
-
-    printf("Ethernet Destination: ");
-    for (int i = 0; i < 6; i++) printf("%02X ", header.mac_dst[i] & 0xFF);
-    printf("\n");
-
-    printf("Ethernet Source: ");
-    for (int i = 0; i < 6; i++) printf("%02X ", header.mac_src[i] & 0xFF);
+    printf("MAC DST: ");
+    for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_dst[i]);
+    printf("\nMAC SRC: ");
+    for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_src[i]);
     printf("\n");
 
     if (nbytes < 0) {
@@ -65,9 +54,6 @@ int main(void) {
       close(fd);
       exit(1);
     }
-
-    for (int i = off; i < nbytes; i++) printf("%02X ", buffer[i] & 0xFF);
-    printf("\n\n");
   }
 
   return 0;

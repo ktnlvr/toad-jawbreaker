@@ -5,6 +5,14 @@
 
 #define DEBUG_BYTE ((toad::byte)0xCC)
 #define DEBUG_U32 ((toad::u32)0xDDCCBBAA)
+#define EXPECT(expr, expectation)                                           \
+  do {                                                                      \
+    if (!(expr)) {                                                          \
+      fprintf(stderr, "EXPECTATION %s FAILED %s:%d\t%s\n", #expr, __FILE__, \
+              __LINE__, expectation);                                       \
+      exit(-2);                                                             \
+    }                                                                       \
+  } while (0)
 
 namespace toad {
 
