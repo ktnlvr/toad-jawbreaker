@@ -1,6 +1,6 @@
 make:
 	mkdir -p build/
-	clang -g ./src/main.cpp -o ./build/toad
+	clang -g ./src/main.cpp -o ./build/toad -std=c++20 -lstdc++
 
 setup:
 	ip link set dev toad up

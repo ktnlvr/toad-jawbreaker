@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "./dispatch.hpp"
 #include "./protocols/arp.hpp"
 #include "./protocols/ethernet.hpp"
 #include "./protocols/ethertype.hpp"
@@ -36,10 +37,30 @@ int main(void) {
     exit(1);
   }
 
-  byte* buffer = (byte*)malloc(0xFFFF);
+  Dispatcher dispatcher;
+
   while (1) {
+    ErrorCode errc;
+    byte* buff = nullptr;
+    sz buff_size = 0;
+
+    while ((errc = dispatcher.dequeue_packet(&buff, &buff_size)) !=
+           ErrorCode::NOT_ENOUGH_DATA) {
+      if (errc != ErrorCode::OK) break;
+
+      // TODO: send buffer
+      free(buff);
+    }
+
+    byte* buffer = (byte*)malloc(0xFFFF);
     EthernetFrame ethernet_frame;
-    sz nbytes = read(fd, buffer, 0xFFFF);
+
+    const sz nbytes = read(fd, buffer, 0xFFFF);
+    if (nbytes < 0) {
+      perror("Reading from interface");
+      close(fd);
+      exit(1);
+    }
 
     // Skip first 4 bytes for the EtherType coming from TUN/TAP
     buffer_to_ethernet(buffer + 4, nbytes - 4, &ethernet_frame);
@@ -53,10 +74,9 @@ int main(void) {
       printf("%02X ", ethernet_frame.buffer[i]);
     printf("\n");
 
-    if (nbytes < 0) {
-      perror("Reading from interface");
-      close(fd);
-      exit(1);
+    dispatcher.enqueue_packet(buffer, nbytes);
+
+    while ((errc = dispatcher.process_next()) != ErrorCode::NOT_ENOUGH_DATA) {
     }
   }
 

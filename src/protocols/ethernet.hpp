@@ -18,17 +18,18 @@ struct EthernetFrame {
   u16 length;
 };
 
-ErrorCode buffer_to_ethernet(byte* buffer, sz length, EthernetFrame* eth_head) {
+ErrorCode buffer_to_ethernet(byte* buffer, sz length,
+                             EthernetFrame* ethernet_frame) {
   if (length < 6 + 6 + 2 + 4) return ErrorCode::INPUT_BUFFER_TOO_SMALL;
 
-  memcpy(eth_head->mac_dst, buffer, 6);
-  memcpy(eth_head->mac_src, buffer + 6, 6);
+  memcpy(ethernet_frame->mac_dst, buffer, 6);
+  memcpy(ethernet_frame->mac_src, buffer + 6, 6);
 
-  eth_head->eth_type = (EtherType)htons(*(u16*)(buffer + 12));
-  eth_head->buffer = buffer + (6 + 6 + 2);
-  eth_head->length = length - 4 - (6 + 6 + 2);
+  ethernet_frame->eth_type = (EtherType)htons(*(u16*)(buffer + 12));
+  ethernet_frame->buffer = buffer + (6 + 6 + 2);
+  ethernet_frame->length = length - 4 - (6 + 6 + 2);
 
-  memcpy(eth_head->crc_checksum, &buffer[length - 4], 4);
+  memcpy(ethernet_frame->crc_checksum, &buffer[length - 4], 4);
 
   return ErrorCode::OK;
 }
