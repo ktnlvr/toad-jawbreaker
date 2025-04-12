@@ -24,16 +24,22 @@ struct BoundaryPacket {
   std::pair<byte*, sz> data() { return {buffer.data(), buffer.size()}; }
 };
 
+// Immutable context used for Network interactions
+struct NetworkContext {
+  byte my_mac[6] = {};
+};
+
 struct NetworkBoundary {
   static constexpr sz active_buffer_size = 0xFFFF;
 
   int _sockfd = 0;
   int _interface_index = 0;
-  byte* active_buffer = nullptr;
+
+  byte* _active_buffer = nullptr;
 
   NetworkBoundary() {
-    active_buffer = (byte*)malloc(active_buffer_size);
-    memset(active_buffer, 0xCC, active_buffer_size);
+    _active_buffer = (byte*)malloc(active_buffer_size);
+    memset(_active_buffer, 0xCC, active_buffer_size);
   }
 
   NetworkBoundary(NetworkBoundary&&) = delete;
@@ -41,22 +47,30 @@ struct NetworkBoundary {
 
   ~NetworkBoundary() {
     if (_sockfd) close(_sockfd);
-    if (active_buffer) free(active_buffer);
+    if (_active_buffer) free(_active_buffer);
   }
 
-  ErrorCode init() {
+  // HACK: output parameter, replace with a proper result in the future
+  ErrorCode init(NetworkContext* out) {
     if ((_sockfd = socket(AF_PACKET, SOCK_RAW, ETH_P_ALL)) < 0) {
       return ErrorCode::SOCKET_INIT_FAILED;
     }
 
-    struct ifreq if_idx = {0};
-    strncpy(if_idx.ifr_name, "toad", IFNAMSIZ - 1);
-    if (ioctl(_sockfd, SIOCGIFINDEX, &if_idx) < 0) {
+    struct ifreq interface_request = {0};
+    strncpy(interface_request.ifr_name, "toad", IFNAMSIZ - 1);
+    if (ioctl(_sockfd, SIOCGIFINDEX, &interface_request) < 0) {
       close(_sockfd);
       return ErrorCode::SOCKET_SETUP_FAILED;
     }
 
-    _interface_index = if_idx.ifr_ifindex;
+    _interface_index = interface_request.ifr_ifindex;
+    if (ioctl(_sockfd, SIOCGIFHWADDR, &interface_request) < 0) {
+      close(_sockfd);
+      return ErrorCode::SOCKET_SETUP_FAILED;
+    }
+
+    memcpy(out->my_mac, interface_request.ifr_hwaddr.sa_data, 6);
+
     return ErrorCode::OK;
   }
 
@@ -64,8 +78,8 @@ struct NetworkBoundary {
     if (_sockfd == 0) return ErrorCode::NON_RAII_OBJECT_UNINITIALIZED;
     // TODO: check if the data fits in the active buffer
 
-    struct ethhdr* eth = (struct ethhdr*)active_buffer;
-    byte* payload_buffer = active_buffer + ETH_HLEN;
+    struct ethhdr* eth = (struct ethhdr*)_active_buffer;
+    byte* payload_buffer = _active_buffer + ETH_HLEN;
 
     memcpy(eth->h_dest, packet.mac_destination, 6);
     memcpy(eth->h_source, packet.mac_source, 6);
@@ -83,12 +97,7 @@ struct NetworkBoundary {
 
     auto buffer_size = size + ETH_HLEN;
 
-    for (int i = 0; i < buffer_size; i++) {
-      printf("%02X ", active_buffer[i]);
-    }
-    printf("\n");
-
-    sz nbytes = sendto(_sockfd, active_buffer, buffer_size, 0,
+    sz nbytes = sendto(_sockfd, _active_buffer, buffer_size, 0,
                        (sockaddr*)&dest_addr, sizeof(dest_addr));
 
     if (nbytes < 0) return ErrorCode::SOCKET_WRITE_FAILED;
@@ -99,7 +108,7 @@ struct NetworkBoundary {
   }
 
   void reset_active_buffer() {
-    memset(this->active_buffer, 0xCC, active_buffer_size);
+    memset(this->_active_buffer, 0xCC, active_buffer_size);
   }
 };
 

@@ -37,10 +37,12 @@ int main(void) {
     exit(1);
   }
 
-  Dispatcher dispatcher;
   NetworkBoundary boundary;
 
-  boundary.init();
+  NetworkContext ctx;
+  boundary.init(&ctx);
+
+  Dispatcher dispatcher(ctx);
 
   while (1) {
     ErrorCode errc;

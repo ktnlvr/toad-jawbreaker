@@ -18,7 +18,7 @@ enum struct ErrorCode : u16 {
   // The object in use requires an additional method call to be brought into
   // correct state, probably due to the destructor requiring some sort of error
   // handling
-  NON_RAII_OBJECT_UNINITIALIZED = 0x03,
+  NON_RAII_OBJECT_UNINITIALIZED = 0x03 | ERRC_MASK_CRITICAL,
 
   INVALID_ARP_OPERATION = 0x45,
 

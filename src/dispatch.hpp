@@ -20,6 +20,10 @@ struct Dispatcher {
   std::queue<std::vector<byte>> input_queue;
   std::queue<BoundaryPacket> output_queue;
 
+  NetworkContext _ctx;
+
+  Dispatcher(NetworkContext ctx) : _ctx(ctx) {}
+
   void enqueue_packet(byte* buffer, sz size) {
     std::vector<byte> data(size);
     memcpy(data.data(), buffer, size);
@@ -73,7 +77,7 @@ struct Dispatcher {
            4);
 
     // HACK: put the actual MAC here
-    memset(arp_response.sender_mac, 0xFF, 6);
+    memcpy(arp_response.sender_mac, _ctx.my_mac, 6);
 
     // HACK: put the actual IP here
     byte my_ipv4[4] = {10, 0, 0, 1};
