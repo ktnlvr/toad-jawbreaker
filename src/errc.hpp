@@ -15,6 +15,11 @@ enum struct ErrorCode : u16 {
   CODE_PATH_NOT_HANDLED = 0x01,
   NOT_ENOUGH_DATA = 0x02,
 
+  // The object in use requires an additional method call to be brought into
+  // correct state, probably due to the destructor requiring some sort of error
+  // handling
+  NON_RAII_OBJECT_UNINITIALIZED = 0x03,
+
   INVALID_ARP_OPERATION = 0x45,
 
   SOCKET_INIT_FAILED = 0x54,

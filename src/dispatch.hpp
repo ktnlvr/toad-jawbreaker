@@ -12,28 +12,26 @@
 #include "./protocols/ethernet.hpp"
 #include "defs.hpp"
 #include "errc.hpp"
+#include "network.hpp"
 
 namespace toad {
 
 struct Dispatcher {
-  std::queue<std::span<byte>> input_queue, output_queue;
+  std::queue<std::vector<byte>> input_queue;
+  std::queue<BoundaryPacket> output_queue;
 
   void enqueue_packet(byte* buffer, sz size) {
-    input_queue.push({buffer, size});
+    std::vector<byte> data(size);
+    memcpy(data.data(), buffer, size);
+    input_queue.push(data);
   }
 
-  ErrorCode dequeue_packet(byte** out_buffer, sz* size) {
-    if (!output_queue.size()) return ErrorCode::NOT_ENOUGH_DATA;
-    if (out_buffer == nullptr) return ErrorCode::NULLPTR_OUTPUT;
+  auto is_queue_empty() -> bool { return !output_queue.size(); }
 
-    auto buf = std::move(output_queue.front());
-
-    *out_buffer = buf.data();
-    if (size) *size = buf.size();
-
+  BoundaryPacket dequeue_packet() {
+    auto packet = std::move(output_queue.front());
     output_queue.pop();
-
-    return ErrorCode::OK;
+    return packet;
   }
 
   ErrorCode process_next() {
@@ -53,7 +51,6 @@ struct Dispatcher {
         ArpPacket arp;
         errc =
             buffer_to_arp(ethernet_frame.buffer, ethernet_frame.length, &arp);
-        if (errc != ErrorCode::OK) goto cleanup;
         handle_arp(arp);
 
         break;
@@ -61,10 +58,8 @@ struct Dispatcher {
       default:
         // WARN: memory leak
         errc = ErrorCode::CODE_PATH_NOT_HANDLED;
-        goto cleanup;
     };
 
-  cleanup:
     return errc;
   }
 
@@ -82,41 +77,16 @@ struct Dispatcher {
 
     // HACK: put the actual IP here
     byte my_ipv4[4] = {10, 0, 0, 1};
-    memcpy(arp_response.sender_protocol_addr, my_ipv4, 6);
+    memcpy(arp_response.sender_protocol_addr, my_ipv4, 4);
 
-    int sockfd;
-    struct sockaddr_ll dest_addr = {0};
-    byte frame[ETH_HLEN + 28];
+    std::vector<byte> arp_data(28);
+    arp_response.write_to_buffer(arp_data.data(), 28);
 
-    if ((sockfd = socket(AF_PACKET, SOCK_RAW, ETH_P_ALL)) < 0) {
-      return ErrorCode::SOCKET_INIT_FAILED;
-    }
+    auto packet =
+        BoundaryPacket(arp_response.target_mac, arp_response.sender_mac,
+                       EtherType::ARP, arp_data);
 
-    struct ifreq if_idx = {0};
-    strncpy(if_idx.ifr_name, "toad", IFNAMSIZ - 1);
-    if (ioctl(sockfd, SIOCGIFINDEX, &if_idx) < 0) {
-      close(sockfd);
-      return ErrorCode::SOCKET_SETUP_FAILED;
-    }
-
-    struct ethhdr* eth = (struct ethhdr*)frame;
-    memcpy(eth->h_dest, arp_response.target_mac, ETH_ALEN);
-    memcpy(eth->h_source, arp_response.sender_mac, ETH_ALEN);
-    eth->h_proto = htons(ETH_P_ARP);
-
-    arp_response.write_to_buffer(frame + ETH_HLEN, 28);
-
-    dest_addr.sll_family = AF_PACKET;
-    dest_addr.sll_ifindex = if_idx.ifr_ifindex;
-    dest_addr.sll_halen = ETH_ALEN;
-    memcpy(dest_addr.sll_addr, eth->h_dest, ETH_ALEN);
-
-    sz nbytes = sendto(sockfd, frame, sizeof(frame), 0, (sockaddr*)&dest_addr,
-                       sizeof(dest_addr));
-
-    if (nbytes < 0) return ErrorCode::SOCKET_WRITE_FAILED;
-
-    close(sockfd);
+    output_queue.push(packet);
 
     return ErrorCode::OK;
   }

@@ -38,18 +38,16 @@ int main(void) {
   }
 
   Dispatcher dispatcher;
+  NetworkBoundary boundary;
+
+  boundary.init();
 
   while (1) {
     ErrorCode errc;
-    byte* buff = nullptr;
-    sz buff_size = 0;
 
-    while ((errc = dispatcher.dequeue_packet(&buff, &buff_size)) !=
-           ErrorCode::NOT_ENOUGH_DATA) {
-      if (errc != ErrorCode::OK) break;
-
-      // TODO: send buffer
-      free(buff);
+    while (!dispatcher.is_queue_empty()) {
+      auto packet = dispatcher.dequeue_packet();
+      boundary.send(packet);
     }
 
     byte* buffer = (byte*)malloc(0xFFFF);
@@ -61,15 +59,6 @@ int main(void) {
       close(fd);
       exit(1);
     }
-
-    printf("MAC DST: ");
-    for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_dst[i]);
-    printf("\nMAC SRC: ");
-    for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_src[i]);
-    printf("\nDATA:");
-    for (int i = 0; i < ethernet_frame.length; i++)
-      printf("%02X ", ethernet_frame.buffer[i]);
-    printf("\n");
 
     dispatcher.enqueue_packet(buffer + 4, nbytes - 4);
 

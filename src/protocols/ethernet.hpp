@@ -9,6 +9,8 @@
 namespace toad {
 
 struct EthernetFrame {
+  static constexpr sz STATIC_DATA_SIZE = 14;
+
   byte mac_dst[6];
   byte mac_src[6];
   EtherType eth_type;
