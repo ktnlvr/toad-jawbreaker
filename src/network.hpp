@@ -39,7 +39,7 @@ struct NetworkBoundary {
 
   NetworkBoundary() {
     _active_buffer = (byte*)malloc(active_buffer_size);
-    memset(_active_buffer, 0xCC, active_buffer_size);
+    memset(_active_buffer, 0x00, active_buffer_size);
   }
 
   NetworkBoundary(NetworkBoundary&&) = delete;
@@ -97,6 +97,10 @@ struct NetworkBoundary {
 
     auto buffer_size = size + ETH_HLEN;
 
+    // Insufficiently large frames are dropped, this forces the zeros to also be
+    // taken into account
+    if (buffer_size < 60) buffer_size = 60;
+
     sz nbytes = sendto(_sockfd, _active_buffer, buffer_size, 0,
                        (sockaddr*)&dest_addr, sizeof(dest_addr));
 
@@ -108,7 +112,7 @@ struct NetworkBoundary {
   }
 
   void reset_active_buffer() {
-    memset(this->_active_buffer, 0xCC, active_buffer_size);
+    memset(this->_active_buffer, 0x00, active_buffer_size);
   }
 };
 
