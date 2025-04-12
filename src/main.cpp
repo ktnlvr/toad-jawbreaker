@@ -62,9 +62,6 @@ int main(void) {
       exit(1);
     }
 
-    // Skip first 4 bytes for the EtherType coming from TUN/TAP
-    buffer_to_ethernet(buffer + 4, nbytes - 4, &ethernet_frame);
-
     printf("MAC DST: ");
     for (int i = 0; i < 6; i++) printf("%02X", ethernet_frame.mac_dst[i]);
     printf("\nMAC SRC: ");
@@ -74,9 +71,12 @@ int main(void) {
       printf("%02X ", ethernet_frame.buffer[i]);
     printf("\n");
 
-    dispatcher.enqueue_packet(buffer, nbytes);
+    dispatcher.enqueue_packet(buffer + 4, nbytes - 4);
 
     while ((errc = dispatcher.process_next()) != ErrorCode::NOT_ENOUGH_DATA) {
+      if (errc != ErrorCode::OK) {
+        printf("ERROR WHEN PROCESSING NEXT: %02X\n", errc);
+      }
     }
   }
 

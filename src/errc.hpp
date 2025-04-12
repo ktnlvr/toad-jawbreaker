@@ -15,8 +15,15 @@ enum struct ErrorCode : u16 {
   CODE_PATH_NOT_HANDLED = 0x01,
   NOT_ENOUGH_DATA = 0x02,
 
+  INVALID_ARP_OPERATION = 0x45,
+
+  SOCKET_INIT_FAILED = 0x54,
+  SOCKET_SETUP_FAILED = 0x55,
+  SOCKET_WRITE_FAILED = 0x56,
+  SOCKET_READ_FAILED = 0x57,
+
   // Not enough data in the input buffer to possibly perform the operation.
-  INPUT_BUFFER_TOO_SMALL = 0x100 | ERRC_MASK_MALFORMED_INPUT,
+  BUFFER_TOO_SMALL = 0x100 | ERRC_MASK_MALFORMED_INPUT,
   // Nullptr passed as an output parameter
   NULLPTR_OUTPUT = 0x101 | ERRC_MASK_MALFORMED_INPUT,
 };
