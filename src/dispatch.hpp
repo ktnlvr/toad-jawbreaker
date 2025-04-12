@@ -81,7 +81,7 @@ struct Dispatcher {
     memset(arp_response.sender_mac, 0xFF, 6);
 
     // HACK: put the actual IP here
-    byte my_ipv4[4] = {10, 0, 0, 5};
+    byte my_ipv4[4] = {10, 0, 0, 1};
     memcpy(arp_response.sender_protocol_addr, my_ipv4, 6);
 
     int sockfd;
