@@ -4,6 +4,9 @@ make:
 	mkdir -p build/
 	clang -g ./src/main.cpp -o ./build/toad -std=c++20 -lstdc++
 
+run: make
+	sudo $(mprocs) "./build/toad" "sleep 1s; make setup-network-device;" "sleep 2s; tshark -i toad" "sleep 2s; make ping"
+
 troubleshoot: make
 	sudo $(mprocs) "sleep 1s; make setup-network-device;" "sleep 2s; tshark -i toad" "sleep 2s; make ping"
 
