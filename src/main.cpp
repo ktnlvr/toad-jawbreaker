@@ -10,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include "arp.hpp"
 #include "defs.hpp"
 #include "device.hpp"
 #include "frame.hpp"
@@ -23,6 +24,7 @@ int main(void) {
       Device::try_new("toad", "10.12.14.1", "255.255.255.0").value();
 
   spdlog::debug("(half-life scientist) everything.. seems to be in order");
+  spdlog::debug("ARP is expecting {} bytes", ArpIPv4::EXPECTED_LENGTH_BUFFER);
 
   u8 *buffer = new u8[device.maximum_transmission_unit];
   while (true) {
@@ -49,6 +51,14 @@ int main(void) {
 
     EthernetFrame frame(dst, src, ethertype, {buffer + 14, payload_size});
     spdlog::trace("Processed {} bytes: {}", n, frame);
+
+    auto arp_res = ArpIPv4::from_buffer({frame.payload, payload_size});
+
+    if (!arp_res.is_ok())
+      continue;
+
+    auto arp = arp_res.ok();
+    spdlog::trace("{}", arp);
   }
 
   delete[] buffer;

@@ -6,10 +6,9 @@
 #include <span>
 
 #include "defs.hpp"
+#include "mac.hpp"
 
 namespace toad {
-
-struct MAC : std::array<u8, 6> {};
 
 struct EthernetFrame {
   MAC dst;
@@ -39,19 +38,9 @@ template <> struct formatter<toad::EthernetFrame> {
 
   template <typename FormatContext>
   auto format(const toad::EthernetFrame &f, FormatContext &ctx) {
-    auto mac_to_string = [&](auto out, const uint8_t mac[6]) {
-      return format_to(out, "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac[0],
-                       mac[1], mac[2], mac[3], mac[4], mac[5]);
-    };
-
     auto out = ctx.out();
-    out = mac_to_string(out, f.dst);
-    out = format_to(out, " -> ");
-    out = mac_to_string(out, f.src);
-    out = format_to(out,
-                    "   ethertype=0x{:04X}"
-                    "   payload_size={}",
-                    f.ethertype, f.payload_size);
+    out = format_to(out, "{} -> {}  ethertype=0x{:04X} payload_size={}", f.src,
+                    f.dst, f.ethertype, f.payload_size);
     return out;
   }
 };
