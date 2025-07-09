@@ -1,4 +1,0 @@
-[ ] UDP server.
-[ ] UDP client.
-[ ] Connecting them together.
-[ ] A `make` command to run a mock UDP client/server pair.
