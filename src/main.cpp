@@ -11,55 +11,20 @@
 #include <unistd.h>
 
 #include "defs.hpp"
+#include "device.hpp"
 #include "frame.hpp"
 
 using namespace toad;
 
 int main(void) {
-  int fd = open("/dev/net/tun", O_RDWR);
-
-  if (fd < 0) {
-    perror("Opening /dev/net/tun");
-    return 1;
-  }
-
-  ifreq ifr;
-  std::memset(&ifr, 0, sizeof(ifr));
-  ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-  std::strncpy(ifr.ifr_name, "toad", IFNAMSIZ);
-
-  if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
-    perror("ioctl(TUNSETIFF)");
-    close(fd);
-    return 1;
-  }
-
-  int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock_fd < 0) {
-    perror("socket");
-    close(fd);
-    return 1;
-  }
-
-  ifreq mtu;
-  std::memset(&mtu, 0, sizeof(ifreq));
-  std::strncpy(mtu.ifr_name, ifr.ifr_name, IFNAMSIZ);
-  if (ioctl(sock_fd, SIOCGIFMTU, &mtu) < 0) {
-    perror("ioctl(SIOCGIFMTU)");
-    close(sock_fd);
-    return 1;
-  }
-  size_t mtu_size = mtu.ifr_mtu;
-  // 14 from the src, dst and ethertype
-  size_t buf_size = mtu_size + 14;
-
-  std::cout << "TAP interface '" << ifr.ifr_name << "' created with MTU "
-            << mtu_size << ".\n";
+  Device device = Device::try_new("10.12.14.1", "255.255.255.0").value();
 
   while (true) {
-    u8 *buffer = new u8[mtu_size];
-    ssz n = read(fd, buffer, buf_size);
+    u8 *buffer = new u8[device.maximum_transmission_unit];
+    ssz n = read(device.fd, buffer, device.maximum_transmission_unit);
+
     if (n < 0) {
+      std::cout << errno << std::endl;
       return 14;
     }
     if (n < 14) {
@@ -76,7 +41,6 @@ int main(void) {
     std::memcpy(frame.payload, buffer + 14, frame.payload_size);
   }
 
-  close(fd);
   return EXIT_SUCCESS;
 
   return 0;
