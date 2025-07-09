@@ -24,8 +24,8 @@ int main(void) {
 
   spdlog::debug("(half-life scientist) everything.. seems to be in order");
 
+  u8 *buffer = new u8[device.maximum_transmission_unit];
   while (true) {
-    u8 *buffer = new u8[device.maximum_transmission_unit];
     ssz n = read(device.fd, buffer, device.maximum_transmission_unit);
 
     if (n < 0) {
@@ -33,6 +33,8 @@ int main(void) {
       return 14;
     }
     if (n < 14) {
+      spdlog::trace("Received a packet that is too small ({} bytes), skipping",
+                    n);
       continue;
     }
 
@@ -44,6 +46,8 @@ int main(void) {
     frame.payload_size = n - 14;
     frame.payload = new u8[frame.payload_size];
     std::memcpy(frame.payload, buffer + 14, frame.payload_size);
+
+    spdlog::trace("Processed {} bytes: {}", n, frame);
   }
 
   return EXIT_SUCCESS;
