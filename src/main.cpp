@@ -29,28 +29,29 @@ int main(void) {
     ssz n = read(device.fd, buffer, device.maximum_transmission_unit);
 
     if (n < 0) {
-      std::cout << errno << std::endl;
-      return 14;
+      return errno;
     }
+
     if (n < 14) {
       spdlog::trace("Received a packet that is too small ({} bytes), skipping",
                     n);
       continue;
     }
 
-    EthernetFrame frame;
-    std::memcpy(frame.dst, buffer, 6);
-    std::memcpy(frame.src, buffer + 6, 6);
-    frame.ethertype = ntohs(*(u16 *)(buffer + 12));
+    MAC dst, src;
+    u16 ethertype;
 
-    frame.payload_size = n - 14;
-    frame.payload = new u8[frame.payload_size];
-    std::memcpy(frame.payload, buffer + 14, frame.payload_size);
+    std::memcpy(dst.data(), buffer, 6);
+    std::memcpy(src.data(), buffer + 6, 6);
+    ethertype = ntohs(*(u16 *)(buffer + 12));
 
+    sz payload_size = n - 14;
+
+    EthernetFrame frame(dst, src, ethertype, {buffer + 14, payload_size});
     spdlog::trace("Processed {} bytes: {}", n, frame);
   }
 
-  return EXIT_SUCCESS;
+  delete[] buffer;
 
   return 0;
 }
