@@ -12,6 +12,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <spdlog/spdlog.h>
+
 #include "defs.hpp"
 
 namespace toad {
@@ -20,21 +22,18 @@ struct Device {
   int fd;
   sz maximum_transmission_unit;
 
-  static auto try_new(std::string_view own_ip, std::string_view network_mask)
-      -> std::optional<Device> {
+  static auto try_new(std::string_view device_name, std::string_view own_ip,
+                      std::string_view network_mask) -> std::optional<Device> {
     Device device;
 
     device.fd = open("/dev/net/tun", O_RDWR);
 
-    if (device.fd < 0) {
-      perror("Opening /dev/net/tun");
-      return {};
-    }
+    ASSERT(device.fd > 0, "File descriptor of /dev/net/tun must be valid");
 
     ifreq ifr;
     std::memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-    std::strncpy(ifr.ifr_name, "toad", IFNAMSIZ);
+    std::strncpy(ifr.ifr_name, device_name.data(), IFNAMSIZ);
 
     if (ioctl(device.fd, TUNSETIFF, (void *)&ifr) < 0) {
       perror("ioctl(TUNSETIFF)");
@@ -91,11 +90,10 @@ struct Device {
     close(sock_fd);
 
     sz mtu_size = mtu.ifr_mtu;
-
-    std::cout << "TAP interface '" << ifr.ifr_name << "' created with MTU "
-              << mtu_size << ".\n";
-
     device.maximum_transmission_unit = mtu_size;
+
+    spdlog::info("TAP interface {} at {} with netmask {} created with MTU={}",
+                 device_name, own_ip, network_mask, mtu_size);
 
     return device;
   }

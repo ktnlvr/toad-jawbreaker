@@ -17,7 +17,12 @@
 using namespace toad;
 
 int main(void) {
-  Device device = Device::try_new("10.12.14.1", "255.255.255.0").value();
+  spdlog::set_level(spdlog::level::trace);
+
+  Device device =
+      Device::try_new("toad", "10.12.14.1", "255.255.255.0").value();
+
+  spdlog::debug("(half-life scientist) everything.. seems to be in order");
 
   while (true) {
     u8 *buffer = new u8[device.maximum_transmission_unit];
