@@ -24,31 +24,17 @@ int main(void) {
       Device::try_new("toad", "10.12.14.1", "255.255.255.0").value();
 
   spdlog::debug("(half-life scientist) everything.. seems to be in order");
-  spdlog::debug("ARP is expecting {} bytes", ArpIPv4::EXPECTED_LENGTH_BUFFER);
 
-  u8 *buffer = new u8[device.maximum_transmission_unit];
   while (true) {
-    ssz n = read(device.fd, buffer, device.maximum_transmission_unit);
-
-    if (n < 0) {
-      return errno;
-    }
-
-    if (n < 14) {
-      spdlog::trace("Received a packet that is too small ({} bytes), skipping",
-                    n);
+    auto result = device.read_next_eth();
+    if (result.is_err()) {
+      spdlog::error("Error {}", result.error());
       continue;
     }
 
-    Bytes bytes(buffer, n);
-    std::stringstream ss;
-    for (int i = 0; i < n; i++)
-      ss << std::hex << (int)buffer[i] << ' ';
-    spdlog::trace("Bytes: {}", ss.str());
+    auto frame = result.ok();
 
-    auto frame = EthernetFrame::from_bytes(bytes).ok();
-
-    spdlog::trace("Processed {} bytes: {}", n, frame);
+    spdlog::trace("Ethernet Frame: {}", frame);
 
     if (frame.ethertype == 0x0806) {
       auto arp = ArpIPv4::from_bytes(frame.payload());
@@ -60,8 +46,6 @@ int main(void) {
       }
     }
   }
-
-  delete[] buffer;
 
   return 0;
 }

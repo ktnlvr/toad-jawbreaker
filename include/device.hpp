@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 
 #include "defs.hpp"
+#include "frame.hpp"
 #include "mac.hpp"
 
 namespace toad {
@@ -23,6 +24,8 @@ struct Device {
   MAC mac;
   int fd;
   sz maximum_transmission_unit;
+
+  u8 *active_eth_packet_data;
 
   static auto try_new(std::string_view device_name, std::string_view own_ip,
                       std::string_view network_mask) -> std::optional<Device> {
@@ -100,7 +103,26 @@ struct Device {
                  "with MTU={}",
                  device_name, device.mac, own_ip, network_mask, mtu_size);
 
+    device.active_eth_packet_data = new u8[mtu_size + 14];
     return device;
+  }
+
+  auto read_next_eth() -> Result<EthernetFrame, sz> {
+    ssz n = read(fd, active_eth_packet_data, maximum_transmission_unit + 14);
+
+    if (n < 0) {
+      return errno;
+    }
+
+    if (n < 14) {
+      spdlog::trace("Received a packet that is too small ({} bytes), skipping",
+                    n);
+      return 0;
+    }
+
+    auto bytes = Bytes(active_eth_packet_data, n);
+
+    return EthernetFrame::from_bytes(bytes);
   }
 
   ~Device() {}
