@@ -49,16 +49,8 @@ int main(void) {
 
     sz payload_size = n - 14;
 
-    EthernetFrame frame(dst, src, ethertype, {buffer + 14, payload_size});
+    EthernetFrame frame(dst, src, ethertype, buffer, payload_size);
     spdlog::trace("Processed {} bytes: {}", n, frame);
-
-    auto arp_res = ArpIPv4::from_buffer({frame.payload, payload_size});
-
-    if (!arp_res.is_ok())
-      continue;
-
-    auto arp = arp_res.ok();
-    spdlog::trace("{}", arp);
   }
 
   delete[] buffer;
