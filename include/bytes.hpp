@@ -47,6 +47,7 @@ struct Bytes {
     size = std::min(size, remaining());
     std::memcpy(this->ptr + cursor, ptr, size);
     cursor += size;
+    return true;
   }
 
   auto read_u8() -> std::optional<u8> {
