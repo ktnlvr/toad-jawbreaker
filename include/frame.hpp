@@ -26,7 +26,26 @@ struct EthernetFrame {
     this->payload = payload_copy;
   }
 
-  ~EthernetFrame() { delete[] payload; }
+  static const sz MANDATORY_BUFFER_SIZE = 6 + 6 + 2;
+
+  sz to_buffer(std::span<u8> data) {
+    sz size = MANDATORY_BUFFER_SIZE + payload_size;
+
+    ASSERT(data.size_bytes() >= size,
+           "Output buffer must fit {} + {} = {}, but it only fits {}",
+           MANDATORY_BUFFER_SIZE, payload_size, size, data.size_bytes());
+
+    std::memcpy(data.data(), dst.data(), 6);
+    std::memcpy(data.data() + 6, src.data(), 6);
+    data.data()[12] = ethertype & 0xFF;
+    data.data()[13] = (ethertype >> 8) & 0xFF;
+    return size;
+  }
+
+  ~EthernetFrame() {
+    if (payload)
+      delete[] payload;
+  }
 };
 
 } // namespace toad

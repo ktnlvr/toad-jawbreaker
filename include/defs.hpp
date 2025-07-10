@@ -10,7 +10,7 @@
   do {                                                                         \
     if (!(expr)) {                                                             \
       spdlog::critical("Assertion " #expr " failed! {}:{}\t" msg, __FILE__,    \
-                       __LINE__ __VA_ARGS__);                                  \
+                       __LINE__, ##__VA_ARGS__);                               \
       std::abort();                                                            \
     }                                                                          \
   } while (0)

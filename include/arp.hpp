@@ -59,6 +59,19 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
     return arp;
   }
 
+  auto to_response(std::array<u8, hlen> respond_with_hardware_addr) const
+      -> Arp {
+
+    Arp ret = *this;
+    ret.oper = 0x0002;
+    ret.target_hardware_addr = sender_hardware_addr;
+    ret.target_protocol_addr = sender_protocol_addr;
+    ret.sender_protocol_addr = target_protocol_addr;
+    ret.sender_hardware_addr = respond_with_hardware_addr;
+
+    return ret;
+  }
+
   bool to_buffer(std::span<u8> buffer) {
     if (buffer.size_bytes() < EXPECTED_LENGTH_BUFFER)
       return false;
