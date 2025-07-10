@@ -7,6 +7,7 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 
+#include "bytes.hpp"
 #include "defs.hpp"
 #include "result.hpp"
 
@@ -27,34 +28,30 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
       : sender_hardware_addr(sha), target_hardware_addr(tha),
         sender_protocol_addr(spa), target_protocol_addr(tpa), oper(oper) {}
 
-  static auto from_buffer(const std::span<u8> buffer) -> Result<Arp, sz> {
-    if (buffer.size_bytes() < EXPECTED_LENGTH_BUFFER)
-      return 0;
-    if (buffer.size_bytes() - EXPECTED_LENGTH_BUFFER)
+  static auto from_bytes(Bytes bytes) -> Result<Arp, sz> {
+    if (bytes.size < EXPECTED_LENGTH_BUFFER)
       return EXPECTED_LENGTH_BUFFER;
 
-    auto *data = buffer.data();
-    auto read_ne16 = [&](size_t off) {
-      return u16(data[off] << 8 | data[off + 1]);
-    };
+    u16 value = *bytes.read_u16();
+    ASSERT(value == htype, "Mismatched htype, expected {:04X}, got {:04X}",
+           htype, value);
+    value = *bytes.read_u16();
+    ASSERT(value == ptype, "Mismatched ptype, expected {:04X}, got {:04X}",
+           ptype, value);
+    value = *bytes.read_u8();
+    ASSERT(value == hlen, "Mismatched hlen, expected {:02X}, got {:02X}", hlen,
+           value);
+    value = *bytes.read_u8();
+    ASSERT(value == plen, "Mismatched plen, expected {:02X}, got {:02X}", plen,
+           value);
 
-    if (read_ne16(0) != htype)
-      return 0;
-    if (read_ne16(2) != ptype)
-      return 2;
-    if (data[4] != hlen)
-      return 4;
-    if (data[5] != plen)
-      return 5;
-
-    auto oper = read_ne16(6);
+    auto oper = *bytes.read_u16();
     auto arp = Arp(oper, {}, {}, {}, {});
 
-    std::copy_n(data + 8, hlen, arp.sender_hardware_addr.begin());
-    std::copy_n(data + 8 + hlen, plen, arp.sender_protocol_addr.begin());
-    std::copy_n(data + 8 + hlen + plen, hlen, arp.target_hardware_addr.begin());
-    std::copy_n(data + 8 + hlen + plen + hlen, plen,
-                arp.target_protocol_addr.begin());
+    bytes.read_array(arp.sender_hardware_addr.data(), hlen);
+    bytes.read_array(arp.sender_protocol_addr.data(), plen);
+    bytes.read_array(arp.target_hardware_addr.data(), hlen);
+    bytes.read_array(arp.target_protocol_addr.data(), plen);
 
     return arp;
   }

@@ -40,17 +40,25 @@ int main(void) {
       continue;
     }
 
-    MAC dst, src;
-    u16 ethertype;
+    Bytes bytes(buffer, n);
+    std::stringstream ss;
+    for (int i = 0; i < n; i++)
+      ss << std::hex << (int)buffer[i] << ' ';
+    spdlog::trace("Bytes: {}", ss.str());
 
-    std::memcpy(dst.data(), buffer, 6);
-    std::memcpy(src.data(), buffer + 6, 6);
-    ethertype = ntohs(*(u16 *)(buffer + 12));
+    auto frame = EthernetFrame::from_bytes(bytes).ok();
 
-    sz payload_size = n - 14;
-
-    EthernetFrame frame(dst, src, ethertype, buffer, payload_size);
     spdlog::trace("Processed {} bytes: {}", n, frame);
+
+    if (frame.ethertype == 0x0806) {
+      auto arp = ArpIPv4::from_bytes(frame.payload());
+      if (arp.is_ok()) {
+        auto value = arp.ok();
+        spdlog::trace("ARP: {}", value);
+      } else {
+        spdlog::trace("ARP err: {}", arp.error());
+      }
+    }
   }
 
   delete[] buffer;
