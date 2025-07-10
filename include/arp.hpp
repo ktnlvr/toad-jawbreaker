@@ -9,6 +9,8 @@
 
 #include "bytes.hpp"
 #include "defs.hpp"
+#include "ipv4.hpp"
+#include "mac.hpp"
 #include "result.hpp"
 
 namespace toad {
@@ -116,6 +118,23 @@ struct formatter<toad::Arp<htype, ptype, hlen, plen>> {
     out = format_to(out,
                     "<ARP htype=0x{:04X} ptype=0x{:04X} hlen={} plen={} op={}>",
                     htype, ptype, hlen, plen, f.oper);
+    return out;
+  }
+};
+
+template <> struct formatter<toad::ArpIPv4> {
+  constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
+
+  template <typename FormatContext>
+  auto format(const toad::ArpIPv4 &f, FormatContext &ctx) {
+    auto out = ctx.out();
+    out = format_to(out,
+                    "<ARP IPv4 op={} "
+                    "sha={} spa={} tha={} tpa={}>",
+                    f.oper, toad::MAC(f.sender_hardware_addr),
+                    toad::IPv4(f.sender_protocol_addr),
+                    toad::MAC(f.target_hardware_addr),
+                    toad::IPv4(f.target_protocol_addr));
     return out;
   }
 };

@@ -14,6 +14,10 @@
 namespace toad {
 
 struct MAC : std::array<u8, 6> {
+  using std::array<u8, 6>::array;
+
+  MAC(const std::array<u8, 6> &arr) : std::array<u8, 6>(arr) {}
+
   static auto system_addr(std::string_view device_name = "eth0") -> MAC {
     MAC ret;
 

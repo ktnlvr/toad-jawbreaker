@@ -41,6 +41,8 @@ int main(void) {
       if (arp.is_ok()) {
         auto value = arp.ok();
         spdlog::trace("ARP: {}", value);
+        auto response = value.to_response(device.mac);
+        spdlog::trace("ARP response: {}", response);
       } else {
         spdlog::trace("ARP err: {}", arp.error());
       }
