@@ -35,6 +35,20 @@ struct Bytes {
     return true;
   }
 
+  bool write_array(const u8 *ptr, sz size) {
+    if (size > remaining())
+      return false;
+    std::memcpy(this->ptr + cursor, ptr, size);
+    cursor += size;
+    return true;
+  }
+
+  bool write_rest(const u8 *ptr, sz size) {
+    size = std::min(size, remaining());
+    std::memcpy(this->ptr + cursor, ptr, size);
+    cursor += size;
+  }
+
   auto read_u8() -> std::optional<u8> {
     if (cursor == 0)
       return std::nullopt;
