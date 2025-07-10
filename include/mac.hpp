@@ -1,10 +1,45 @@
 #pragma once
 
+#include <array>
+#include <cstring>
+#include <iostream>
+#include <linux/if.h>
+#include <linux/if_arp.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "defs.hpp"
 
 namespace toad {
 
-struct MAC : std::array<u8, 6> {};
+struct MAC : std::array<u8, 6> {
+  static auto system_addr(std::string_view device_name = "eth0") -> MAC {
+    MAC ret;
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
+      return ret;
+
+    struct ifreq ifr{};
+    std::strncpy(ifr.ifr_name, device_name.data(), IFNAMSIZ);
+    if (ioctl(sock, SIOCGIFHWADDR, &ifr) < 0) {
+      close(sock);
+      return ret;
+    }
+    close(sock);
+
+    std::memcpy(ret.data(), ifr.ifr_hwaddr.sa_data, 6);
+    return ret;
+  }
+
+  bool is_default() const {
+    bool is_zero = true;
+    for (int i = 0; i < 6; i++)
+      is_zero &= (*this)[i] == 0;
+    return is_zero;
+  }
+};
 
 } // namespace toad
 

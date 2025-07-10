@@ -15,10 +15,12 @@
 #include <spdlog/spdlog.h>
 
 #include "defs.hpp"
+#include "mac.hpp"
 
 namespace toad {
 
 struct Device {
+  MAC mac;
   int fd;
   sz maximum_transmission_unit;
 
@@ -40,6 +42,8 @@ struct Device {
       close(device.fd);
       return {};
     }
+
+    device.mac = MAC::system_addr();
 
     int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock_fd < 0) {
@@ -92,8 +96,9 @@ struct Device {
     sz mtu_size = mtu.ifr_mtu;
     device.maximum_transmission_unit = mtu_size;
 
-    spdlog::info("TAP interface {} at {} with netmask {} created with MTU={}",
-                 device_name, own_ip, network_mask, mtu_size);
+    spdlog::info("TAP interface {} for device {} at {} with netmask {} created "
+                 "with MTU={}",
+                 device_name, device.mac, own_ip, network_mask, mtu_size);
 
     return device;
   }
