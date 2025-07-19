@@ -108,20 +108,24 @@ struct Device {
     return device;
   }
 
-  auto read_next_eth() -> std::expected<EthernetFrame, sz> {
-    ssz n = read(fd, active_eth_packet_data, maximum_transmission_unit + 14);
+  auto read_next_eth() -> EthernetFrame {
+    sz max_packet_size = maximum_transmission_unit + 14;
+    ssz n = read(fd, active_eth_packet_data, max_packet_size);
 
     if (n < 0) {
-      return std::unexpected(0);
+      std::abort();
     }
 
     if (n < 14) {
       spdlog::trace("Received a packet that is too small ({} bytes), skipping",
                     n);
-      return std::unexpected(0);
+      std::abort();
     }
 
-    return EthernetFrame();
+    spdlog::info("{}", n);
+
+    auto bytes = Bytes(active_eth_packet_data, n);
+    return EthernetFrame::try_from_bytes(bytes);
   }
 
   ~Device() {}

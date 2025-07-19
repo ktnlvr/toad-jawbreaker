@@ -27,6 +27,7 @@ int main(void) {
 
   while (true) {
     auto result = device.read_next_eth();
+    spdlog::info("{}", result);
   }
 
   return 0;

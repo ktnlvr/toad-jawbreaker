@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 #include <span>
 
+#include "bytes.hpp"
 #include "defs.hpp"
 #include "mac.hpp"
 
@@ -15,16 +16,20 @@ struct EthernetFrame {
   MAC src;
   u16 ethertype;
 
-  std::vector<u8> _payload;
+  std::vector<u8> payload;
 
   EthernetFrame() {}
 
-  EthernetFrame(MAC dst, MAC src, u16 ethertype, u8 *ptr, sz size)
-      : dst(dst), src(src), ethertype(ethertype), _payload(ptr, ptr + size) {}
-
   static const sz DST_SRC_ETHETYPE_SZ = 6 + 6 + 2;
 
-  sz buffer_size() const { return _payload.size() + DST_SRC_ETHETYPE_SZ; }
+  static auto try_from_bytes(Bytes &bytes) -> EthernetFrame {
+    EthernetFrame frame;
+    bytes.read_array(frame.dst);
+    bytes.read_array(frame.src);
+    frame.ethertype = bytes.read_u16();
+    bytes.read_vector(frame.payload);
+    return frame;
+  }
 };
 
 } // namespace toad
@@ -38,7 +43,7 @@ template <> struct formatter<toad::EthernetFrame> {
   auto format(const toad::EthernetFrame &f, FormatContext &ctx) {
     auto out = ctx.out();
     out = format_to(out, "{} -> {}  ethertype=0x{:04X} payload_size={}", f.src,
-                    f.dst, f.ethertype, f._payload.size());
+                    f.dst, f.ethertype, f.payload.size());
     return out;
   }
 };
