@@ -11,12 +11,14 @@
 #include "defs.hpp"
 #include "ipv4.hpp"
 #include "mac.hpp"
+#include "typestate.hpp"
 
 namespace toad {
 
 constexpr u16 ETHERTYPE_ARP = 0x0806;
 
-template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
+template <u16 htype, u16 ptype, u8 hlen, u8 plen, TypestateDirection direction>
+struct Arp {
   u16 oper;
 
   std::array<u8, hlen> sender_hardware_addr, target_hardware_addr;
@@ -62,34 +64,34 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
   }
 
   auto clone_as_response(std::array<u8, hlen> respond_with_hardware_addr) const
-      -> Arp {
+      -> Arp<htype, ptype, hlen, plen, ~direction> {
+    u16 oper = 0x0002;
+    std::array<u8, hlen> tha = sender_hardware_addr;
+    std::array<u8, plen> tpa = sender_protocol_addr;
+    std::array<u8, hlen> sha = respond_with_hardware_addr;
+    std::array<u8, plen> spa = target_protocol_addr;
 
-    Arp ret = *this;
-    ret.oper = 0x0002;
-    ret.target_hardware_addr = sender_hardware_addr;
-    ret.target_protocol_addr = sender_protocol_addr;
-    ret.sender_protocol_addr = target_protocol_addr;
-    ret.sender_hardware_addr = respond_with_hardware_addr;
-
-    return ret;
+    return Arp<htype, ptype, hlen, plen, ~direction>(oper, sha, spa, tha, tpa);
   }
 };
 
 constexpr u16 HTYPE_ETHERNET_1 = 0x0001;
 constexpr u16 PTYPE_IPV4 = 0x0800;
 
-using ArpIPv4 = Arp<HTYPE_ETHERNET_1, PTYPE_IPV4, 6, 4>;
+template <TypestateDirection direction>
+using ArpIPv4 = Arp<HTYPE_ETHERNET_1, PTYPE_IPV4, 6, 4, direction>;
 
 } // namespace toad
 
 namespace fmt {
 
-template <toad::u16 htype, toad::u16 ptype, toad::u8 hlen, toad::u8 plen>
-struct formatter<toad::Arp<htype, ptype, hlen, plen>> {
+template <toad::u16 htype, toad::u16 ptype, toad::u8 hlen, toad::u8 plen,
+          toad::TypestateDirection direction>
+struct formatter<toad::Arp<htype, ptype, hlen, plen, direction>> {
   constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
   template <typename FormatContext>
-  auto format(const toad::Arp<htype, ptype, hlen, plen> &f,
+  auto format(const toad::Arp<htype, ptype, hlen, plen, direction> &f,
               FormatContext &ctx) {
     auto out = ctx.out();
     out = format_to(out,
@@ -99,11 +101,12 @@ struct formatter<toad::Arp<htype, ptype, hlen, plen>> {
   }
 };
 
-template <> struct formatter<toad::ArpIPv4> {
+template <toad::TypestateDirection direction>
+struct formatter<toad::ArpIPv4<direction>> {
   constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
   template <typename FormatContext>
-  auto format(const toad::ArpIPv4 &f, FormatContext &ctx) {
+  auto format(const toad::ArpIPv4<direction> &f, FormatContext &ctx) {
     auto out = ctx.out();
     out = format_to(out,
                     "<ARP IPv4 op={} "

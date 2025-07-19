@@ -31,7 +31,7 @@ int main(void) {
 
     if (request.ethertype == ETHERTYPE_ARP) {
       Bytes bytes(request.payload);
-      auto arp = ArpIPv4::try_from_bytes(bytes);
+      auto arp = ArpIPv4<DirectionIn>::try_from_bytes(bytes);
       if (arp.target_protocol_addr != IPv4({10, 12, 14, 99}))
         continue;
 
@@ -40,7 +40,8 @@ int main(void) {
       spdlog::debug("Arp Request: {}", arp);
       spdlog::debug("Arp Response: {}", arp_response);
 
-      std::vector<u8> arp_payload(ArpIPv4::EXPECTED_BUFFER_LENGTH);
+      std::vector<u8> arp_payload(
+          decltype(arp_response)::EXPECTED_BUFFER_LENGTH);
 
       bytes = Bytes(arp_payload);
       arp_response.try_to_bytes(bytes);

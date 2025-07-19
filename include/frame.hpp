@@ -9,9 +9,11 @@
 #include "defs.hpp"
 #include "mac.hpp"
 
+#include "typestate.hpp"
+
 namespace toad {
 
-struct EthernetFrame {
+template <TypestateDirection direction> struct EthernetFrame {
   MAC dst;
   MAC src;
   u16 ethertype;
@@ -46,8 +48,9 @@ struct EthernetFrame {
   }
 
   auto clone_as_response(u16 ethertype, std::vector<u8> &&payload,
-                         MAC override_sender = MAC()) -> EthernetFrame {
-    EthernetFrame ret;
+                         MAC override_sender = MAC())
+      -> EthernetFrame<~direction> {
+    EthernetFrame<~direction> ret;
     ret.dst = this->src;
     if (!override_sender.is_default())
       ret.src = override_sender;
@@ -61,11 +64,12 @@ struct EthernetFrame {
 
 namespace fmt {
 
-template <> struct formatter<toad::EthernetFrame> {
+template <toad::TypestateDirection direction>
+struct formatter<toad::EthernetFrame<direction>> {
   constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
   template <typename FormatContext>
-  auto format(const toad::EthernetFrame &f, FormatContext &ctx) {
+  auto format(const toad::EthernetFrame<direction> &f, FormatContext &ctx) {
     auto out = ctx.out();
     out = format_to(out, "<Eth {} -> {} ethertype=0x{:04X} payload_size={}>",
                     f.src, f.dst, f.ethertype, f.payload.size());
