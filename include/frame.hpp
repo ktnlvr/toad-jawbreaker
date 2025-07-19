@@ -34,6 +34,17 @@ struct EthernetFrame {
     return frame;
   }
 
+  auto min_buffer_size() -> sz const {
+    return 2 * sizeof(MAC) + 2 + payload.size();
+  }
+
+  void try_to_bytes(Bytes &bytes) {
+    bytes.write_array(dst);
+    bytes.write_array(src);
+    bytes.write_u16(ethertype);
+    bytes.write_vector(payload);
+  }
+
   auto clone_as_response(u16 ethertype, std::vector<u8> &&payload,
                          MAC override_sender = MAC()) -> EthernetFrame {
     EthernetFrame ret;

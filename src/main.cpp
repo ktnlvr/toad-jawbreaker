@@ -32,14 +32,25 @@ int main(void) {
     if (request.ethertype == ETHERTYPE_ARP) {
       Bytes bytes(request.payload);
       auto arp = ArpIPv4::try_from_bytes(bytes);
+      if (arp.target_protocol_addr != IPv4({10, 12, 14, 99}))
+        continue;
+
       auto arp_response = arp.clone_as_response(device.mac);
 
       spdlog::debug("Arp Request: {}", arp);
       spdlog::debug("Arp Response: {}", arp_response);
 
       std::vector<u8> arp_payload(ArpIPv4::EXPECTED_BUFFER_LENGTH);
+
+      bytes = Bytes(arp_payload);
+      arp_response.try_to_bytes(bytes);
+
+      MAC fake_mac = device.mac;
+      fake_mac[0]++;
+
       auto response = request.clone_as_response(
-          ETHERTYPE_ARP, std::move(arp_payload), device.mac);
+          ETHERTYPE_ARP, std::move(arp_payload), fake_mac);
+      device.write_eth(response);
       spdlog::debug("Sent Request: {}", response);
     }
   }

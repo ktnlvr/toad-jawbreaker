@@ -126,6 +126,14 @@ struct Device {
     return EthernetFrame::try_from_bytes(bytes);
   }
 
+  auto write_eth(EthernetFrame &frame) {
+    std::vector<u8> buffer(frame.min_buffer_size());
+    auto bytes = Bytes(buffer);
+    frame.try_to_bytes(bytes);
+    ssz n = write(fd, buffer.data(), buffer.size());
+    spdlog::info("Written {}", n);
+  }
+
   ~Device() {}
 
 protected:
