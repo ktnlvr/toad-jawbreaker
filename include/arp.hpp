@@ -7,11 +7,14 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 
+#include "bytes.hpp"
 #include "defs.hpp"
 #include "ipv4.hpp"
 #include "mac.hpp"
 
 namespace toad {
+
+constexpr u16 ETHERTYPE_ARP = 0x0806;
 
 template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
   u16 oper;
@@ -19,7 +22,7 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
   std::array<u8, hlen> sender_hardware_addr, target_hardware_addr;
   std::array<u8, plen> sender_protocol_addr, target_protocol_addr;
 
-  static constexpr sz EXPECTED_LENGTH_BUFFER =
+  static constexpr sz EXPECTED_BUFFER_LENGTH =
       sizeof(htype) + sizeof(ptype) + sizeof(Arp::oper) + sizeof(hlen) +
       sizeof(plen) + 2 * plen + 2 * hlen;
 
@@ -28,7 +31,37 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
       : sender_hardware_addr(sha), target_hardware_addr(tha),
         sender_protocol_addr(spa), target_protocol_addr(tpa), oper(oper) {}
 
-  auto to_response(std::array<u8, hlen> respond_with_hardware_addr) const
+  static auto try_from_bytes(Bytes &bytes) -> Arp {
+    u16 parsed_htype = bytes.read_u16();
+    u16 parsed_ptype = bytes.read_u16();
+    u8 parsed_hlen = bytes.read_u8();
+    u8 parsed_plen = bytes.read_u8();
+    u16 oper = bytes.read_u16();
+
+    std::array<u8, hlen> sha, tha;
+    std::array<u8, plen> spa, tpa;
+
+    bytes.read_array(sha);
+    bytes.read_array(spa);
+    bytes.read_array(tha);
+    bytes.read_array(tpa);
+
+    return Arp(oper, sha, spa, tha, tpa);
+  }
+
+  void try_to_bytes(Bytes &bytes) {
+    bytes.write_u16(htype);
+    bytes.write_u16(ptype);
+    bytes.write_u8(hlen);
+    bytes.write_u8(plen);
+    bytes.write_u16(oper);
+    bytes.write_array(sender_hardware_addr);
+    bytes.write_array(sender_protocol_addr);
+    bytes.write_array(target_hardware_addr);
+    bytes.write_array(target_protocol_addr);
+  }
+
+  auto clone_as_response(std::array<u8, hlen> respond_with_hardware_addr) const
       -> Arp {
 
     Arp ret = *this;

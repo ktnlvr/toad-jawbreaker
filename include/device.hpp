@@ -122,8 +122,6 @@ struct Device {
       std::abort();
     }
 
-    spdlog::info("{}", n);
-
     auto bytes = Bytes(active_eth_packet_data, n);
     return EthernetFrame::try_from_bytes(bytes);
   }

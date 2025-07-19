@@ -20,6 +20,9 @@ struct EthernetFrame {
 
   EthernetFrame() {}
 
+  EthernetFrame(MAC dst, MAC src, u16 ethertype, sz reserve)
+      : dst(dst), src(src), ethertype(ethertype), payload(reserve) {}
+
   static const sz DST_SRC_ETHETYPE_SZ = 6 + 6 + 2;
 
   static auto try_from_bytes(Bytes &bytes) -> EthernetFrame {
@@ -29,6 +32,17 @@ struct EthernetFrame {
     frame.ethertype = bytes.read_u16();
     bytes.read_vector(frame.payload);
     return frame;
+  }
+
+  auto clone_as_response(u16 ethertype, std::vector<u8> &&payload,
+                         MAC override_sender = MAC()) -> EthernetFrame {
+    EthernetFrame ret;
+    ret.dst = this->src;
+    if (!override_sender.is_default())
+      ret.src = override_sender;
+    ret.ethertype = ethertype;
+    ret.payload = payload;
+    return ret;
   }
 };
 
@@ -42,8 +56,8 @@ template <> struct formatter<toad::EthernetFrame> {
   template <typename FormatContext>
   auto format(const toad::EthernetFrame &f, FormatContext &ctx) {
     auto out = ctx.out();
-    out = format_to(out, "{} -> {}  ethertype=0x{:04X} payload_size={}", f.src,
-                    f.dst, f.ethertype, f.payload.size());
+    out = format_to(out, "<Eth {} -> {} ethertype=0x{:04X} payload_size={}>",
+                    f.src, f.dst, f.ethertype, f.payload.size());
     return out;
   }
 };

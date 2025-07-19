@@ -26,8 +26,22 @@ int main(void) {
   spdlog::debug("(half-life scientist) everything.. seems to be in order");
 
   while (true) {
-    auto result = device.read_next_eth();
-    spdlog::info("{}", result);
+    auto request = device.read_next_eth();
+    spdlog::debug("Received Request: {}", request);
+
+    if (request.ethertype == ETHERTYPE_ARP) {
+      Bytes bytes(request.payload);
+      auto arp = ArpIPv4::try_from_bytes(bytes);
+      auto arp_response = arp.clone_as_response(device.mac);
+
+      spdlog::debug("Arp Request: {}", arp);
+      spdlog::debug("Arp Response: {}", arp_response);
+
+      std::vector<u8> arp_payload(ArpIPv4::EXPECTED_BUFFER_LENGTH);
+      auto response = request.clone_as_response(
+          ETHERTYPE_ARP, std::move(arp_payload), device.mac);
+      spdlog::debug("Sent Request: {}", response);
+    }
   }
 
   return 0;
