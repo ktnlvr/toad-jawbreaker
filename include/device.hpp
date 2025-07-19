@@ -17,12 +17,15 @@
 
 #include "defs.hpp"
 #include "frame.hpp"
+#include "ipv4.hpp"
 #include "mac.hpp"
 
 namespace toad {
 
 struct Device {
-  MAC mac;
+  MAC own_mac;
+  IPv4 own_ip;
+
   int fd;
   sz maximum_transmission_unit;
 
@@ -47,7 +50,7 @@ struct Device {
       return {};
     }
 
-    device.mac = MAC::system_addr();
+    device.own_mac = MAC::system_addr();
 
     int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock_fd < 0) {
@@ -66,6 +69,9 @@ struct Device {
       if (ioctl(sock_fd, SIOCSIFADDR, &i_addr) < 0) {
         perror("ioctl(SIOCSIFADDR)");
       }
+
+      const u8 *bytes = (u8 *)(&addr->sin_addr.s_addr);
+      device.own_ip = IPv4({bytes[0], bytes[1], bytes[2], bytes[3]});
 
       sockaddr_in *netmask = (sockaddr_in *)(&i_addr.ifr_netmask);
       netmask->sin_family = AF_INET;
@@ -102,7 +108,7 @@ struct Device {
 
     spdlog::info("TAP interface {} for device {} at {} with netmask {} created "
                  "with MTU={}",
-                 device_name, device.mac, own_ip, network_mask, mtu_size);
+                 device_name, device.own_mac, own_ip, network_mask, mtu_size);
 
     device.active_eth_packet_data = new u8[mtu_size + 14];
     return device;

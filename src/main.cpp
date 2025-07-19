@@ -32,10 +32,14 @@ int main(void) {
     if (request.ethertype == ETHERTYPE_ARP) {
       Bytes bytes(request.payload);
       auto arp = ArpIPv4<DirectionIn>::try_from_bytes(bytes);
-      if (arp.target_protocol_addr != IPv4({10, 12, 14, 99}))
+
+      IPv4 resolved_ip = device.own_ip;
+      resolved_ip[3]++;
+
+      if (arp.target_protocol_addr != resolved_ip)
         continue;
 
-      auto arp_response = arp.clone_as_response(device.mac);
+      auto arp_response = arp.clone_as_response(device.own_mac);
 
       spdlog::debug("Arp Request: {}", arp);
       spdlog::debug("Arp Response: {}", arp_response);
@@ -46,7 +50,7 @@ int main(void) {
       bytes = Bytes(arp_payload);
       arp_response.try_to_bytes(bytes);
 
-      MAC fake_mac = device.mac;
+      MAC fake_mac = device.own_mac;
       fake_mac[0]++;
 
       auto response = request.clone_as_response(
