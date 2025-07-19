@@ -11,3 +11,12 @@ build:
 
 run: build
     ./build/main
+
+alias ds := docs-serve
+docs-serve:
+    mkdocs serve
+
+alias db := docs-build
+docs-build:
+    mkdir -p ./build/
+    mkdocs build -d build/docs
