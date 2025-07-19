@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <expected>
 #include <fcntl.h>
 #include <iostream>
 #include <linux/if.h>
@@ -107,22 +108,20 @@ struct Device {
     return device;
   }
 
-  auto read_next_eth() -> Result<EthernetFrame, sz> {
+  auto read_next_eth() -> std::expected<EthernetFrame, sz> {
     ssz n = read(fd, active_eth_packet_data, maximum_transmission_unit + 14);
 
     if (n < 0) {
-      return errno;
+      return std::unexpected(0);
     }
 
     if (n < 14) {
       spdlog::trace("Received a packet that is too small ({} bytes), skipping",
                     n);
-      return 0;
+      return std::unexpected(0);
     }
 
-    auto bytes = Bytes(active_eth_packet_data, n);
-
-    return EthernetFrame::from_bytes(bytes);
+    return EthernetFrame();
   }
 
   ~Device() {}

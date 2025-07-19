@@ -27,26 +27,6 @@ int main(void) {
 
   while (true) {
     auto result = device.read_next_eth();
-    if (result.is_err()) {
-      spdlog::error("Error {}", result.error());
-      continue;
-    }
-
-    auto frame = result.ok();
-
-    spdlog::trace("Ethernet Frame: {}", frame);
-
-    if (frame.ethertype == 0x0806) {
-      auto arp = ArpIPv4::from_bytes(frame.payload());
-      if (arp.is_ok()) {
-        auto value = arp.ok();
-        spdlog::trace("ARP: {}", value);
-        auto response = value.to_response(device.mac);
-        spdlog::trace("ARP response: {}", response);
-      } else {
-        spdlog::trace("ARP err: {}", arp.error());
-      }
-    }
   }
 
   return 0;

@@ -7,11 +7,9 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 
-#include "bytes.hpp"
 #include "defs.hpp"
 #include "ipv4.hpp"
 #include "mac.hpp"
-#include "result.hpp"
 
 namespace toad {
 
@@ -30,34 +28,6 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
       : sender_hardware_addr(sha), target_hardware_addr(tha),
         sender_protocol_addr(spa), target_protocol_addr(tpa), oper(oper) {}
 
-  static auto from_bytes(Bytes bytes) -> Result<Arp, sz> {
-    if (bytes.size < EXPECTED_LENGTH_BUFFER)
-      return EXPECTED_LENGTH_BUFFER;
-
-    u16 value = *bytes.read_u16();
-    ASSERT(value == htype, "Mismatched htype, expected {:04X}, got {:04X}",
-           htype, value);
-    value = *bytes.read_u16();
-    ASSERT(value == ptype, "Mismatched ptype, expected {:04X}, got {:04X}",
-           ptype, value);
-    value = *bytes.read_u8();
-    ASSERT(value == hlen, "Mismatched hlen, expected {:02X}, got {:02X}", hlen,
-           value);
-    value = *bytes.read_u8();
-    ASSERT(value == plen, "Mismatched plen, expected {:02X}, got {:02X}", plen,
-           value);
-
-    auto oper = *bytes.read_u16();
-    auto arp = Arp(oper, {}, {}, {}, {});
-
-    bytes.read_array(arp.sender_hardware_addr.data(), hlen);
-    bytes.read_array(arp.sender_protocol_addr.data(), plen);
-    bytes.read_array(arp.target_hardware_addr.data(), hlen);
-    bytes.read_array(arp.target_protocol_addr.data(), plen);
-
-    return arp;
-  }
-
   auto to_response(std::array<u8, hlen> respond_with_hardware_addr) const
       -> Arp {
 
@@ -69,32 +39,6 @@ template <u16 htype, u16 ptype, u8 hlen, u8 plen> struct Arp {
     ret.sender_hardware_addr = respond_with_hardware_addr;
 
     return ret;
-  }
-
-  bool to_buffer(std::span<u8> buffer) {
-    if (buffer.size_bytes() < EXPECTED_LENGTH_BUFFER)
-      return false;
-
-    auto write_ne16 = [&](size_t off, u16 data) {
-      buffer[off] = (data >> 8) & 0xFF;
-      buffer[off + 1] = data & 0xFF;
-    };
-
-    auto *data = buffer.data();
-    write_ne16(0, htype);
-    write_ne16(2, ptype);
-    buffer[4] = hlen;
-    buffer[5] = plen;
-
-    write_ne16(6, oper);
-
-    std::copy_n(sender_hardware_addr.begin(), hlen, data + 8);
-    std::copy_n(sender_protocol_addr.begin(), plen, data + 8 + hlen);
-    std::copy_n(target_hardware_addr.begin(), hlen, data + 8 + hlen + plen);
-    std::copy_n(target_protocol_addr.begin(), plen,
-                data + 8 + hlen + plen + hlen);
-
-    return true;
   }
 };
 
