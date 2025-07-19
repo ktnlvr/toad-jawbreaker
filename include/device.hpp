@@ -29,7 +29,7 @@ struct Device {
   int fd;
   sz maximum_transmission_unit;
 
-  u8 *active_eth_packet_data;
+  std::vector<u8> active_eth_packet_data;
 
   static auto try_new(std::string_view device_name, std::string_view own_ip,
                       std::string_view network_mask) -> std::optional<Device> {
@@ -110,13 +110,13 @@ struct Device {
                  "with MTU={}",
                  device_name, device.own_mac, own_ip, network_mask, mtu_size);
 
-    device.active_eth_packet_data = new u8[mtu_size + 14];
+    device.active_eth_packet_data = std::vector<u8>(mtu_size + 14);
     return device;
   }
 
   auto read_next_eth() -> EthernetFrame<DirectionIn> {
     sz max_packet_size = maximum_transmission_unit + 14;
-    ssz n = read(fd, active_eth_packet_data, max_packet_size);
+    ssz n = read(fd, active_eth_packet_data.data(), max_packet_size);
 
     if (n < 0) {
       std::abort();
@@ -128,7 +128,7 @@ struct Device {
       std::abort();
     }
 
-    auto bytes = Bytes(active_eth_packet_data, n);
+    auto bytes = Bytes(active_eth_packet_data);
     return EthernetFrame<DirectionIn>::try_from_bytes(bytes);
   }
 
