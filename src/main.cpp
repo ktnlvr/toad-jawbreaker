@@ -13,7 +13,7 @@
 #include "arp.hpp"
 #include "defs.hpp"
 #include "device.hpp"
-#include "frame.hpp"
+#include "ethernet.hpp"
 #include "icmp.hpp"
 
 using namespace toad;

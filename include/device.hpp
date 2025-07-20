@@ -16,7 +16,7 @@
 #include <spdlog/spdlog.h>
 
 #include "defs.hpp"
-#include "frame.hpp"
+#include "ethernet.hpp"
 #include "ipv4.hpp"
 #include "mac.hpp"
 
