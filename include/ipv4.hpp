@@ -61,10 +61,9 @@ template <TypestateDirection direction> struct Ip {
     bytes.read_array(ret.src);
     bytes.read_array(ret.dst);
     // TODO: optional field
-    sz payload_size = bytes.remaining() - 4;
     ret.payload = {
         bytes.ptr,
-        payload_size,
+        bytes.remaining(),
     };
 
     return ret;
