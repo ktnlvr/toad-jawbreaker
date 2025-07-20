@@ -29,8 +29,8 @@ int main(void) {
     auto request = device.read_next_eth();
     spdlog::debug("Received Request: {}", request);
 
+    Bytes bytes(request.payload);
     if (request.ethertype == ETHERTYPE_ARP) {
-      Bytes bytes(request.payload);
       auto arp = ArpIPv4<DirectionIn>::try_from_bytes(bytes);
 
       IPv4 resolved_ip = device.own_ip;
@@ -57,6 +57,9 @@ int main(void) {
           ETHERTYPE_ARP, std::move(arp_payload), fake_mac);
       device.write_eth(response);
       spdlog::debug("Sent Request: {}", response);
+    } else if (request.ethertype == ETHERTYPE_IPV4) {
+      auto ip = Ip<DirectionIn>::try_from_bytes(bytes);
+      spdlog::info("{}", ip);
     }
   }
 
