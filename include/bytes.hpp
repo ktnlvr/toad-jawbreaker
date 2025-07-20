@@ -14,17 +14,16 @@ struct Bytes {
   sz size, cursor;
   u8 *ptr;
 
-  Bytes(std::vector<u8> &vec, sz cursor = 0)
-      : ptr(vec.data()), size(vec.size()), cursor(cursor) {}
-
-  Bytes(u8 *ptr, sz size, sz cursor = 0)
-      : ptr(ptr), size(size), cursor(cursor) {}
+  Bytes(std::vector<u8> &vec, sz size = 0, sz cursor = 0)
+      : ptr(vec.data()), size(size ? size : vec.size()), cursor(cursor) {
+    ASSERT(size <= vec.size(),
+           "Specified size ({}) must be within the vector bounds (0..{})", size,
+           vec.size());
+  }
 
   void write_u8(u8 value) { ptr[cursor++] = value; }
 
   void write_u16(u16 value) {
-    if constexpr (std::endian::native != std::endian::little)
-      value = std::byteswap(value);
     ptr[cursor++] = (value >> 8) & 0xFF;
     ptr[cursor++] = value & 0xFF;
   }
@@ -45,8 +44,6 @@ struct Bytes {
     u16 hi = ptr[cursor++];
     u16 lo = ptr[cursor++];
     u16 le_result = (hi << 8) | lo;
-    if constexpr (std::endian::native != std::endian::little)
-      return std::byteswap(le_result);
     return le_result;
   }
 
