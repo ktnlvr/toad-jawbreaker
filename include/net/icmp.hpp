@@ -18,7 +18,7 @@ enum struct IcmpType : u8 {
 template <TypestateDirection direction> struct Icmp {
   IcmpType type;
   u8 code;
-  u16 checksum;
+  toad::checksum checksum;
   // TODO: maybe use a union instead?
   std::array<u8, 4> rest;
   Buffer payload;
@@ -43,7 +43,7 @@ template <TypestateDirection direction> struct Icmp {
 
     stream.read_u8((u8 *)&ret.type)
         .read_u8(&ret.code)
-        .read_u16(&ret.checksum)
+        .read_u16(&ret.checksum.n)
         .read_array(&ret.rest)
         .read_buffer(&ret.payload);
 
@@ -68,7 +68,7 @@ template <TypestateDirection direction> struct Icmp {
 
   sz buffer_size() const { return 1 + 1 + 2 + rest.size() + payload.size; }
 
-  u16 calculate_checksum() const {
+  toad::checksum calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
     Buffer buffer(padded_buffer_size);
@@ -80,7 +80,7 @@ template <TypestateDirection direction> struct Icmp {
     buffer.data()[2] = 0;
     buffer.data()[3] = 0;
 
-    return internet_checksum(buffer.data(), buffer.size);
+    return toad::checksum({buffer.data(), buffer.size});
   }
 
   auto clone_as_echo_response() const -> Icmp<~direction> {

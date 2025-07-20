@@ -27,6 +27,9 @@ int main(void) {
   MAC fake_mac = device.own_mac;
   fake_mac[0]++;
 
+  IPv4 resolve_ip = device.own_ip;
+  resolve_ip[3]++;
+
   spdlog::debug("(half-life scientist) everything.. seems to be in order");
 
   while (true) {
@@ -40,10 +43,7 @@ int main(void) {
 
       spdlog::info("{}", arp);
 
-      IPv4 resolved_ip = device.own_ip;
-      resolved_ip[3]++;
-
-      if (arp.target_protocol_addr != resolved_ip)
+      if (arp.target_protocol_addr != resolve_ip)
         continue;
 
       auto arp_response = arp.copy_as_response(device.own_mac);

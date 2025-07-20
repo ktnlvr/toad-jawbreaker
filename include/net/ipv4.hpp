@@ -33,7 +33,7 @@ template <TypestateDirection direction> struct Ip {
   u16 fragment_offset;
   u8 ttl;
   u8 protocol;
-  u16 header_checksum;
+  checksum header_checksum;
   IPv4 src;
   IPv4 dst;
   /// NOTE(Artur): Options would go here, but I'm not sure how to parse them yet
@@ -74,7 +74,7 @@ template <TypestateDirection direction> struct Ip {
         .read_u16(&flags_fragment_offset)
         .read_u8(&ret.ttl)
         .read_u8(&ret.protocol)
-        .read_u16(&ret.header_checksum)
+        .read_u16(&ret.header_checksum.n)
         .read_array(&ret.src)
         .read_array(&ret.dst)
         .read_buffer(&ret.payload);
@@ -133,7 +133,7 @@ template <TypestateDirection direction> struct Ip {
     return IP_HEADER_SIZE + payload.size;
   }
 
-  u16 calculate_checksum() const {
+  checksum calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
     Buffer buffer(padded_buffer_size);
@@ -145,7 +145,7 @@ template <TypestateDirection direction> struct Ip {
     buffer.data()[10] = 0;
     buffer.data()[11] = 0;
 
-    return internet_checksum(buffer.data(), buffer.size);
+    return checksum({buffer.data(), buffer.size});
   }
 };
 
