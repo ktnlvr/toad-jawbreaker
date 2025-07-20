@@ -36,3 +36,7 @@ Toad is trying to hit a different niche. It is for cases when the outer network 
 ## Security Considerations
 
 ## Examples
+
+## Code Style
+
+Heavily inspired by [TigerStyle](https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md) and [NASA's Power of Ten](https://spinroot.com/gerard/pdf/P10.pdf). Adhering to this should be just fine.
