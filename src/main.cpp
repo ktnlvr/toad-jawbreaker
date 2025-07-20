@@ -33,9 +33,12 @@ int main(void) {
     auto request = device.read_next_eth();
     spdlog::debug("Received Request: {}", request);
 
-    Bytes bytes(request.payload);
+    ByteIStream ethernet_payload_istream = request.payload;
     if (request.ethertype == ETHERTYPE_ARP) {
-      auto arp = ArpIPv4<DirectionIn>::try_from_bytes(bytes);
+      auto arp =
+          ArpIPv4<DirectionIn>::try_from_stream(ethernet_payload_istream);
+
+      spdlog::info("{}", arp);
 
       IPv4 resolved_ip = device.own_ip;
       resolved_ip[3]++;
@@ -48,42 +51,47 @@ int main(void) {
       spdlog::debug("Arp Request: {}", arp);
       spdlog::debug("Arp Response: {}", arp_response);
 
-      std::vector<u8> arp_payload(
-          decltype(arp_response)::EXPECTED_BUFFER_LENGTH);
+      sz arp_payload_size = decltype(arp_response)::EXPECTED_BUFFER_LENGTH;
+      auto response =
+          request.clone_as_response(ETHERTYPE_ARP, arp_payload_size, fake_mac);
 
-      bytes = Bytes(arp_payload);
-      arp_response.try_to_bytes(bytes);
+      ByteOStream ethernet_response_ostream = response.payload;
+      arp_response.try_to_stream(ethernet_response_ostream);
 
-      auto response = request.clone_as_response(
-          ETHERTYPE_ARP, std::move(arp_payload), fake_mac);
+      spdlog::info("{}", response);
+
       device.write_eth(response);
       spdlog::debug("Sent Request: {}", response);
     } else if (request.ethertype == ETHERTYPE_IPV4) {
-      auto ip = Ip<DirectionIn>::try_from_bytes(bytes);
+      auto ip = Ip<DirectionIn>::try_from_stream(ethernet_payload_istream);
       spdlog::info("{} {} {}", ip, ip.header_checksum, ip.calculate_checksum());
 
       if (ip.protocol == PROTOCOL_ICMP) {
-        Bytes bytes = Bytes(ip.payload);
-        auto icmp = Icmp<DirectionIn>::try_from_bytes(bytes);
+        auto ip_payload_istream = ByteIStream(ip.payload);
+        auto icmp = Icmp<DirectionIn>::try_from_stream(ip_payload_istream);
         auto icmp_response = icmp.clone_as_echo_response();
 
-        std::vector<u8> icmp_payload(icmp_response.buffer_size());
-        Bytes icmp_payload_bytes = Bytes(icmp_payload);
-        icmp_response.try_to_bytes(icmp_payload_bytes);
-        spdlog::info("ICMP Payload Size: {}", icmp_payload.size());
+        auto icmp_response_size = icmp_response.buffer_size();
+        auto ip_payload_size = IP_HEADER_SIZE + icmp_response_size;
 
-        auto ip_response = ip.clone_as_response(std::move(icmp_payload));
-        spdlog::info("{}\n{}", icmp_response, ip_response);
+        spdlog::info("Payload size! {}", ip_payload_size);
 
-        std::vector<u8> ip_payload(ip_response.buffer_size());
-        Bytes ip_payload_bytes = Bytes(ip_payload, ip_response.total_length);
-        ip_response.try_to_bytes(ip_payload_bytes);
+        Buffer icmp_raw_buffer(icmp_response.buffer_size());
+        ByteOStream icmp_ostream = ByteOStream(icmp_raw_buffer);
+        icmp_response.try_to_stream(icmp_ostream);
 
-        auto response = request.clone_as_response(
-            ETHERTYPE_IPV4, std::move(ip_payload), fake_mac);
+        std::vector<u8> ip_payload_raw(icmp_raw_buffer.size);
+        ByteIStream(icmp_raw_buffer).read_vector(&ip_payload_raw);
 
-        spdlog::info("{}", response);
-        device.write_eth(response);
+        auto ip_response = ip.clone_as_response(std::move(ip_payload_raw));
+        spdlog::info("{}", ip_response.payload);
+
+        auto eth_response = request.clone_as_response(
+            ETHERTYPE_IPV4, ip_payload_size, fake_mac);
+        ByteOStream eth_response_payload_ostream = eth_response.payload;
+        ip_response.try_to_stream(eth_response_payload_ostream);
+        spdlog::info("{}", eth_response);
+        device.write_eth(eth_response);
       }
     }
   }

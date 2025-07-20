@@ -9,12 +9,12 @@ namespace toad {
 /// @brief Calculates the [Internet
 /// Checksum](https://en.wikipedia.org/wiki/Internet_checksum) specified
 /// in [RFC791](https://www.rfc-editor.org/rfc/rfc791).
-u16 internet_checksum(std::span<u8> buffer) {
-  ASSERT(buffer.size() % 2 == 0, "The buffer must be a multiple of two.");
-  ASSERT(buffer.size() > 0, "The buffer size must be positive");
+u16 internet_checksum(u8 *buffer, sz size) {
+  ASSERT(size % 2 == 0, "The buffer must be a multiple of two.");
+  ASSERT(size > 0, "The buffer size must be positive");
 
   u32 acc = 0;
-  for (sz i = 0; i < buffer.size(); i += 2) {
+  for (sz i = 0; i < size; i += 2) {
     // Assumed to be BE
     u16 word = (buffer[i] << 8) | buffer[i + 1];
     acc += word;

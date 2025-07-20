@@ -29,8 +29,6 @@ struct Device {
   int fd;
   sz maximum_transmission_unit;
 
-  std::vector<u8> active_eth_packet_data;
-
   static auto try_new(std::string_view device_name, std::string_view own_ip,
                       std::string_view network_mask) -> std::optional<Device> {
     Device device;
@@ -109,14 +107,14 @@ struct Device {
     spdlog::info("TAP interface {} for device {} at {} with netmask {} created "
                  "with MTU={}",
                  device_name, device.own_mac, own_ip, network_mask, mtu_size);
-
-    device.active_eth_packet_data = std::vector<u8>(mtu_size + 14);
     return device;
   }
 
   auto read_next_eth() -> EthernetFrame<DirectionIn> {
     sz max_packet_size = maximum_transmission_unit + 14;
-    ssz n = read(fd, active_eth_packet_data.data(), max_packet_size);
+    /// XXX(Artur): leaked
+    u8 *data = new u8[max_packet_size];
+    ssz n = read(fd, data, max_packet_size);
 
     if (n < 0) {
       std::abort();
@@ -128,15 +126,20 @@ struct Device {
       std::abort();
     }
 
-    auto bytes = Bytes(active_eth_packet_data);
-    return EthernetFrame<DirectionIn>::try_from_bytes(bytes);
+    auto buffer = Buffer(data, n);
+
+    spdlog::warn("{}", buffer);
+
+    auto stream = ByteIStream(buffer);
+    return EthernetFrame<DirectionIn>::try_from_stream(stream);
   }
 
   auto write_eth(EthernetFrame<DirectionOut> &frame) {
-    std::vector<u8> buffer(frame.min_buffer_size());
-    auto bytes = Bytes(buffer);
-    frame.try_to_bytes(bytes);
-    ssz n = write(fd, buffer.data(), buffer.size());
+    Buffer buffer(maximum_transmission_unit);
+    auto ostream = ByteOStream(buffer);
+    frame.try_to_stream(ostream);
+    sz packet_length = ostream.cursor;
+    ssz n = write(fd, buffer.data(), packet_length);
     spdlog::info("Written {}", n);
   }
 

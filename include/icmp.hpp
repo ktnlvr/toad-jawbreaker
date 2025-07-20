@@ -1,6 +1,5 @@
 #pragma once
 
-#include "bytes.hpp"
 #include "checksum.hpp"
 #include "typestate.hpp"
 
@@ -21,7 +20,7 @@ template <TypestateDirection direction> struct Icmp {
   u16 checksum;
   // TODO: maybe use a union instead?
   std::array<u8, 4> rest;
-  std::vector<u8> payload;
+  Buffer payload;
 
   Icmp() {}
 
@@ -30,14 +29,14 @@ template <TypestateDirection direction> struct Icmp {
       : type(icmp.type), code(icmp.code), checksum(icmp.checksum),
         rest(icmp.rest), payload(icmp.payload) {}
 
-  static Icmp try_from_bytes(Bytes &bytes) {
+  static Icmp try_from_stream(ByteIStream &stream) {
     Icmp ret;
 
-    ret.type = (IcmpType)bytes.read_u8();
-    ret.code = bytes.read_u8();
-    ret.checksum = bytes.read_u16();
-    bytes.read_array(ret.rest);
-    bytes.read_vector(ret.payload);
+    stream.read_u8((u8 *)&ret.type)
+        .read_u8(&ret.code)
+        .read_u16(&ret.checksum)
+        .read_array(&ret.rest)
+        .read_buffer(&ret.payload);
 
     // NOTE(Artur): If we are sending a malformed packet its a logical error,
     // but if we receive it from the user the checksum mismatch might be
@@ -50,30 +49,29 @@ template <TypestateDirection direction> struct Icmp {
     return ret;
   }
 
-  void try_to_bytes(Bytes &bytes) const {
-    bytes.write_u8((u8)type);
-    bytes.write_u8(code);
-    bytes.write_u16(checksum);
-    bytes.write_array(rest);
-    bytes.write_vector(payload);
+  void try_to_stream(ByteOStream &bytes) const {
+    bytes.write_u8((u8)type)
+        .write_u8(code)
+        .write_u16(checksum)
+        .write_array(rest)
+        .write_buffer(payload);
   }
 
-  sz buffer_size() const { return 1 + 1 + 2 + rest.size() + payload.size(); }
+  sz buffer_size() const { return 1 + 1 + 2 + rest.size() + payload.size; }
 
   u16 calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
-    std::vector<u8> buffer(padded_buffer_size);
-
-    Bytes bytes(buffer);
-    try_to_bytes(bytes);
+    Buffer buffer(padded_buffer_size);
+    auto ostream = ByteOStream(buffer);
+    try_to_stream(ostream);
 
     // Zero out the place where the checksum would be
     // equivalent to skipping the checksum field
-    buffer[2] = 0;
-    buffer[3] = 0;
+    buffer.data()[2] = 0;
+    buffer.data()[3] = 0;
 
-    return internet_checksum(buffer);
+    return internet_checksum(buffer.data(), buffer.size);
   }
 
   auto clone_as_echo_response() const -> Icmp<~direction> {

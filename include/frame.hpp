@@ -5,7 +5,7 @@
 #include <fmt/format.h>
 #include <span>
 
-#include "bytes.hpp"
+#include "bytestream.hpp"
 #include "defs.hpp"
 #include "mac.hpp"
 
@@ -18,36 +18,38 @@ template <TypestateDirection direction> struct EthernetFrame {
   MAC src;
   u16 ethertype;
 
-  std::vector<u8> payload;
+  Buffer payload;
 
   EthernetFrame() {}
 
-  EthernetFrame(MAC dst, MAC src, u16 ethertype, sz reserve)
-      : dst(dst), src(src), ethertype(ethertype), payload(reserve) {}
+  EthernetFrame(MAC dst, MAC src, u16 ethertype)
+      : dst(dst), src(src), ethertype(ethertype) {}
 
   static const sz DST_SRC_ETHETYPE_SZ = 6 + 6 + 2;
 
-  static auto try_from_bytes(Bytes &bytes) -> EthernetFrame {
+  static auto try_from_stream(ByteIStream &bytes) -> EthernetFrame {
     EthernetFrame frame;
-    bytes.read_array(frame.dst);
-    bytes.read_array(frame.src);
-    frame.ethertype = bytes.read_u16();
-    bytes.read_vector(frame.payload);
+
+    bytes.read_array(&frame.dst)
+        .read_array(&frame.src)
+        .read_u16(&frame.ethertype)
+        .read_buffer(&frame.payload);
+
+    // TODO: error check
+
     return frame;
   }
 
   auto min_buffer_size() -> sz const {
-    return 2 * sizeof(MAC) + 2 + payload.size();
+    return 2 * sizeof(MAC) + 2 + payload.size;
   }
 
-  void try_to_bytes(Bytes &bytes) {
-    bytes.write_array(dst);
-    bytes.write_array(src);
-    bytes.write_u16(ethertype);
-    bytes.write_vector(payload);
+  void try_to_stream(ByteOStream &stream) {
+    stream.write_array(dst).write_array(src).write_u16(ethertype).write_buffer(
+        payload);
   }
 
-  auto clone_as_response(u16 ethertype, std::vector<u8> &&payload,
+  auto clone_as_response(u16 ethertype, sz payload_size,
                          MAC override_sender = MAC())
       -> EthernetFrame<~direction> {
     EthernetFrame<~direction> ret;
@@ -55,7 +57,7 @@ template <TypestateDirection direction> struct EthernetFrame {
     if (!override_sender.is_default())
       ret.src = override_sender;
     ret.ethertype = ethertype;
-    ret.payload = payload;
+    ret.payload = Buffer(payload_size);
     return ret;
   }
 };
@@ -72,7 +74,7 @@ struct formatter<toad::EthernetFrame<direction>> {
   auto format(const toad::EthernetFrame<direction> &f, FormatContext &ctx) {
     auto out = ctx.out();
     out = format_to(out, "<Eth {} -> {} ethertype=0x{:04X} payload_size={}>",
-                    f.src, f.dst, f.ethertype, f.payload.size());
+                    f.src, f.dst, f.ethertype, f.payload.size);
     return out;
   }
 };

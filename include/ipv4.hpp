@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-#include "bytes.hpp"
+#include "bytestream.hpp"
 #include "checksum.hpp"
 #include "defs.hpp"
 #include "typestate.hpp"
@@ -36,7 +36,7 @@ template <TypestateDirection direction> struct Ip {
   IPv4 src;
   IPv4 dst;
   /// NOTE(Artur): Options would go here, but I'm not sure how to parse them yet
-  std::vector<u8> payload;
+  Buffer payload;
 
   Ip() {}
 
@@ -48,60 +48,64 @@ template <TypestateDirection direction> struct Ip {
         protocol(ip.protocol), header_checksum(ip.header_checksum), src(ip.src),
         dst(ip.dst) {}
 
-  static Ip try_from_bytes(Bytes &bytes) {
+  static Ip try_from_stream(ByteIStream &stream) {
     Ip ret;
 
-    u8 version_ihl = bytes.read_u8();
+    u8 version_ihl;
+    u8 dscp_ecn;
+    u16 flags_fragment_offset;
+
+    stream.read_u8(&version_ihl)
+        .read_u8(&dscp_ecn)
+        .read_u16(&ret.total_length)
+        .read_u16(&ret.identification)
+        .read_u16(&flags_fragment_offset)
+        .read_u8(&ret.ttl)
+        .read_u8(&ret.protocol)
+        .read_u16(&ret.header_checksum)
+        .read_array(&ret.src)
+        .read_array(&ret.dst)
+        .read_buffer(&ret.payload);
+
+    // TODO: return result
+    ASSERT(stream.errc == ByteStreamErrorCode::Ok,
+           "Failed to read {} bytes, IP packet at cursor={}: {}",
+           (int)stream.errc, stream.last_size, stream.cursor, stream.buffer);
+
     ret.version = (version_ihl >> 4) & 0xF;
     ret.ihl = version_ihl & 0xF;
 
-    u8 dscp_ecn = bytes.read_u8();
     ret.dscp = (dscp_ecn >> 2) & 0b111111;
     ret.ecn = dscp_ecn & 0b11;
 
-    ret.total_length = bytes.read_u16();
-    ret.identification = bytes.read_u16();
-
-    u16 flags_fragment_offset = bytes.read_u16();
     ret.flags = (flags_fragment_offset >> 13) & 0b111;
     ret.fragment_offset = (flags_fragment_offset & 0x1FFF);
-
-    ret.ttl = bytes.read_u8();
-    ret.protocol = bytes.read_u8();
-    ret.header_checksum = bytes.read_u16();
-
-    bytes.read_array(ret.src);
-    bytes.read_array(ret.dst);
-    bytes.read_vector(ret.payload, ret.total_length - IP_HEADER_SIZE);
 
     return ret;
   }
 
-  void try_to_bytes(Bytes &bytes) const {
-    bytes.write_u8((version << 4) | ihl);
-    bytes.write_u8((dscp << 2) | ecn);
-    bytes.write_u16(total_length);
-    bytes.write_u16(identification);
+  void try_to_stream(ByteOStream &stream) const {
+    stream.write_u8((version << 4) | ihl)
+        .write_u8((dscp << 2) | ecn)
+        .write_u16(total_length)
+        .write_u16(identification);
 
     // NOTE(Artur): Some additional bytes
     // swizzling needs to be done since
     // this is technically a 2-byte word
     u8 hi_byte = (flags << 5) | ((fragment_offset >> 8) & 0x1F);
     u8 lo_byte = fragment_offset & 0xFF;
-    bytes.write_u8(hi_byte);
-    bytes.write_u8(lo_byte);
+    stream.write_u8(hi_byte).write_u8(lo_byte);
 
-    bytes.write_u8(ttl);
-    bytes.write_u8(protocol);
-    bytes.write_u16(header_checksum);
-
-    bytes.write_array(src);
-    bytes.write_array(dst);
-    bytes.write_vector(payload);
+    stream.write_u8(ttl)
+        .write_u8(protocol)
+        .write_u16(header_checksum)
+        .write_array(src)
+        .write_array(dst)
+        .write_buffer(payload);
   }
 
-  auto clone_as_response(std::vector<u8> &&payload, u8 ttl = 64) const
-      -> Ip<~direction> {
+  auto clone_as_response(Buffer payload, u8 ttl = 64) const -> Ip<~direction> {
     auto response = Ip<~direction>(*this);
 
     response.payload = payload;
@@ -114,23 +118,22 @@ template <TypestateDirection direction> struct Ip {
 
   auto buffer_size() const -> sz {
     // TODO(Artur): respect optional data
-    return IP_HEADER_SIZE + payload.size();
+    return IP_HEADER_SIZE + payload.size;
   }
 
   u16 calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
-    std::vector<u8> buffer(padded_buffer_size);
-
-    Bytes bytes(buffer);
-    try_to_bytes(bytes);
+    Buffer buffer(padded_buffer_size);
+    auto ostream = ByteOStream(buffer);
+    try_to_stream(ostream);
 
     // Zero out the place where the checksum would be
     // equivalent to skipping the checksum field
-    buffer[10] = 0;
-    buffer[11] = 0;
+    buffer.data()[10] = 0;
+    buffer.data()[11] = 0;
 
-    return internet_checksum(buffer);
+    return internet_checksum(buffer.data(), buffer.size);
   }
 };
 
