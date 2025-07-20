@@ -14,6 +14,7 @@
 #include "defs.hpp"
 #include "device.hpp"
 #include "frame.hpp"
+#include "icmp.hpp"
 
 using namespace toad;
 
@@ -39,7 +40,7 @@ int main(void) {
       if (arp.target_protocol_addr != resolved_ip)
         continue;
 
-      auto arp_response = arp.clone_as_response(device.own_mac);
+      auto arp_response = arp.copy_as_response(device.own_mac);
 
       spdlog::debug("Arp Request: {}", arp);
       spdlog::debug("Arp Response: {}", arp_response);
@@ -60,6 +61,10 @@ int main(void) {
     } else if (request.ethertype == ETHERTYPE_IPV4) {
       auto ip = Ip<DirectionIn>::try_from_bytes(bytes);
       spdlog::info("{}", ip);
+      if (ip.protocol == PROTOCOL_ICMP) {
+        Bytes bytes = Bytes(ip.payload);
+        auto icmp = Icmp<DirectionOut>::try_from_bytes(bytes);
+      }
     }
   }
 

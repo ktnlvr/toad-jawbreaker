@@ -2,6 +2,7 @@
 
 #include <array>
 #include <span>
+#include <vector>
 
 #include "bytes.hpp"
 #include "defs.hpp"
@@ -32,7 +33,7 @@ template <TypestateDirection direction> struct Ip {
   IPv4 src;
   IPv4 dst;
   /// NOTE(Artur): Options would go here, but I'm not sure how to parse them yet
-  std::span<u8> payload;
+  std::vector<u8> payload;
 
   Ip() {}
 
@@ -60,11 +61,7 @@ template <TypestateDirection direction> struct Ip {
 
     bytes.read_array(ret.src);
     bytes.read_array(ret.dst);
-    // TODO: optional field
-    ret.payload = {
-        bytes.ptr,
-        bytes.remaining(),
-    };
+    bytes.read_vector(ret.payload);
 
     return ret;
   }
@@ -92,7 +89,8 @@ struct formatter<toad::Ip<direction>> {
   template <typename FormatContext>
   auto format(const toad::Ip<direction> &f, FormatContext &ctx) {
     auto out = ctx.out();
-    out = format_to(out, "<IP {} -> {}>", f.src, f.dst);
+    out = format_to(out, "<IP {} -> {} protocol=0x{:02X}>", f.src, f.dst,
+                    f.protocol);
     return out;
   }
 };

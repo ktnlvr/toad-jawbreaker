@@ -63,7 +63,7 @@ struct Arp {
     bytes.write_array(target_protocol_addr);
   }
 
-  auto clone_as_response(std::array<u8, hlen> respond_with_hardware_addr) const
+  auto copy_as_response(std::array<u8, hlen> respond_with_hardware_addr) const
       -> Arp<htype, ptype, hlen, plen, ~direction> {
     u16 oper = 0x0002;
     std::array<u8, hlen> tha = sender_hardware_addr;
