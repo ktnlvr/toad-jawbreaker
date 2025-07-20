@@ -5,9 +5,10 @@
 #include <fmt/format.h>
 #include <span>
 
-#include "bytestream.hpp"
+#include "../bytes/bytestream.hpp"
 #include "defs.hpp"
 #include "mac.hpp"
+#include "packet.hpp"
 
 #include "typestate.hpp"
 
@@ -19,6 +20,14 @@ template <TypestateDirection direction> struct EthernetFrame {
   u16 ethertype;
 
   Buffer payload;
+
+  static constexpr auto header_size() -> sz { return 14; }
+  auto header_dynamic_size() -> sz { return 0; }
+  auto payload_size() -> sz { return payload.size; }
+
+  auto size() -> sz {
+    return header_size() + header_dynamic_size() + payload_size();
+  }
 
   EthernetFrame() {}
 
@@ -61,6 +70,8 @@ template <TypestateDirection direction> struct EthernetFrame {
     return ret;
   }
 };
+
+static_assert(Packet<EthernetFrame<DirectionIn>>);
 
 } // namespace toad
 

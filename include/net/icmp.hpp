@@ -1,6 +1,7 @@
 #pragma once
 
 #include "checksum.hpp"
+#include "packet.hpp"
 #include "typestate.hpp"
 
 #include <vector>
@@ -21,6 +22,14 @@ template <TypestateDirection direction> struct Icmp {
   // TODO: maybe use a union instead?
   std::array<u8, 4> rest;
   Buffer payload;
+
+  static constexpr auto header_size() -> sz { return 8; }
+  auto header_dynamic_size() -> sz { return 0; }
+  auto payload_size() -> sz { return payload.size; }
+
+  auto size() -> sz {
+    return header_size() + header_dynamic_size() + payload_size();
+  }
 
   Icmp() {}
 
@@ -85,6 +94,8 @@ template <TypestateDirection direction> struct Icmp {
     return response;
   }
 };
+
+static_assert(Packet<Icmp<DirectionIn>>);
 
 } // namespace toad
 

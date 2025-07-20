@@ -23,6 +23,14 @@ struct Arp {
   std::array<u8, hlen> sender_hardware_addr, target_hardware_addr;
   std::array<u8, plen> sender_protocol_addr, target_protocol_addr;
 
+  static constexpr auto header_size() -> sz { return 28; }
+  auto header_dynamic_size() -> sz { return 0; }
+  auto payload_size() -> sz { return 0; }
+
+  auto size() -> sz {
+    return header_size() + header_dynamic_size() + payload_size();
+  }
+
   static constexpr sz EXPECTED_BUFFER_LENGTH =
       sizeof(htype) + sizeof(ptype) + sizeof(Arp::oper) + sizeof(hlen) +
       sizeof(plen) + 2 * plen + 2 * hlen;

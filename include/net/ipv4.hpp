@@ -4,9 +4,10 @@
 #include <span>
 #include <vector>
 
-#include "bytestream.hpp"
+#include "../bytes/bytestream.hpp"
 #include "checksum.hpp"
 #include "defs.hpp"
+#include "packet.hpp"
 #include "typestate.hpp"
 
 namespace toad {
@@ -37,6 +38,17 @@ template <TypestateDirection direction> struct Ip {
   IPv4 dst;
   /// NOTE(Artur): Options would go here, but I'm not sure how to parse them yet
   Buffer payload;
+
+  static constexpr auto header_size() -> sz { return 20; }
+  auto header_dynamic_size() -> sz {
+    // TODO: handle options
+    return 0;
+  }
+  auto payload_size() -> sz { return payload.size; }
+
+  auto size() -> sz {
+    return header_size() + header_dynamic_size() + payload_size();
+  }
 
   Ip() {}
 
@@ -136,6 +148,8 @@ template <TypestateDirection direction> struct Ip {
     return internet_checksum(buffer.data(), buffer.size);
   }
 };
+
+static_assert(Packet<Ip<DirectionIn>>);
 
 } // namespace toad
 

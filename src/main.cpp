@@ -10,11 +10,11 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "arp.hpp"
 #include "defs.hpp"
-#include "device.hpp"
-#include "ethernet.hpp"
-#include "icmp.hpp"
+#include "net/arp.hpp"
+#include "net/device.hpp"
+#include "net/ethernet.hpp"
+#include "net/icmp.hpp"
 
 using namespace toad;
 
