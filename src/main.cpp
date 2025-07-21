@@ -16,10 +16,23 @@
 #include "nic/ethernet.hpp"
 #include "nic/icmp.hpp"
 
+#include "concurrency/executor.hpp"
+
 using namespace toad;
+
+toad::Task<void> sample() {
+  spdlog::info("Before");
+  co_await std::suspend_always{};
+  spdlog::info("After");
+}
 
 int main(void) {
   spdlog::set_level(spdlog::level::trace);
+  spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
+
+  Executor executor;
+  executor.spawn(sample());
+  return 0;
 
   Device device =
       Device::try_new("toad", "10.12.14.1", "255.255.255.0").value();
