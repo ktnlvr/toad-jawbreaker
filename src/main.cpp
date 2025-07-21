@@ -11,10 +11,10 @@
 #include <unistd.h>
 
 #include "defs.hpp"
-#include "net/arp.hpp"
-#include "net/device.hpp"
-#include "net/ethernet.hpp"
-#include "net/icmp.hpp"
+#include "nic/arp.hpp"
+#include "nic/device.hpp"
+#include "nic/ethernet.hpp"
+#include "nic/icmp.hpp"
 
 using namespace toad;
 
