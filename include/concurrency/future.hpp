@@ -20,12 +20,22 @@ template <typename T> struct FutureState {
   std::atomic<bool> is_ready = false;
   std::mutex _mutex = {};
   ErasedHandle continuation = {};
+
+  ~FutureState() {}
 };
 
 template <typename T> struct FutureHandle {
   std::weak_ptr<FutureState<T>> _state;
 
+  FutureHandle() {}
   FutureHandle(std::shared_ptr<FutureState<T>> state) : _state(state) {}
+  ~FutureHandle() {}
+
+  FutureHandle(const FutureHandle &other) : _state(other._state) {}
+  FutureHandle operator=(const FutureHandle &other) {
+    _state = other._state;
+    return *this;
+  }
 
   void set_value(T &&value) {
     auto ptr = _state.lock();

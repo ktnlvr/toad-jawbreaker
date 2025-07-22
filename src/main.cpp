@@ -18,6 +18,7 @@
 
 #include "concurrency/executor.hpp"
 #include "concurrency/future.hpp"
+#include "concurrency/iocontext.hpp"
 
 using namespace toad;
 
@@ -34,14 +35,28 @@ toad::Task<void> sample(Future<int> future) {
   spdlog::info("After: {}", x);
 }
 
+Task<void> client_acceptor(Future<Socket> future) {
+  spdlog::info("Waiting for a socket...");
+  auto sock = co_await future;
+  spdlog::info("Omg! Got client, fd = {}", sock._sockfd);
+}
+
 int main(void) {
   spdlog::set_level(spdlog::level::trace);
   spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
+
+  IOContext io_ctx;
 
   Executor executor;
   auto [future, handle] = Future<int>::make_future();
   executor.spawn(sample(future));
   executor.spawn(future_setter(handle));
+
+  auto sock_accept_future = io_ctx.submit_accept_ipv4(9955);
+
+  executor.spawn(client_acceptor(sock_accept_future));
+
+  io_ctx.event_loop();
 
   return 0;
 
