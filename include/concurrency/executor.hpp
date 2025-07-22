@@ -22,7 +22,6 @@ auto this_executor() -> Executor & {
 
 struct Executor {
   Executor(sz num_threads = 1) {
-    _this_executor = this;
     _threads.reserve(num_threads);
     for (sz i = 0; i < num_threads; i++)
       _threads.emplace_back([this]() { this->worker_thread(); });
