@@ -35,10 +35,14 @@ toad::Task<void> sample(Future<int> future) {
   spdlog::info("After: {}", x);
 }
 
-Task<void> client_acceptor(Future<Socket> future) {
-  spdlog::info("Waiting for a socket...");
-  auto sock = co_await future;
-  spdlog::info("Omg! Got client, fd = {}", sock._sockfd);
+Task<void> client_acceptor(const Listener &listener) {
+  IOContext &io = this_io_context();
+
+  while (true) {
+    spdlog::info("Waiting for a socket...");
+    auto client = co_await io.submit_accept_ipv4(listener);
+    spdlog::info("Omg! Got client, fd = {}", client._sockfd);
+  }
 }
 
 int main(void) {
@@ -52,9 +56,9 @@ int main(void) {
   executor.spawn(sample(future));
   executor.spawn(future_setter(handle));
 
-  auto sock_accept_future = io_ctx.submit_accept_ipv4(9955);
+  auto listener = io_ctx.new_listener(9955);
 
-  executor.spawn(client_acceptor(sock_accept_future));
+  executor.spawn(client_acceptor(listener));
 
   io_ctx.event_loop();
 
