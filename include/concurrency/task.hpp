@@ -16,8 +16,8 @@ template <typename T> struct Task {
 
     Task get_return_object() { return Task(Handle::from_promise(*this)); }
 
-    std::suspend_never initial_suspend() noexcept { return {}; }
-    std::suspend_never final_suspend() noexcept { return {}; }
+    std::suspend_always initial_suspend() noexcept { return {}; }
+    std::suspend_always final_suspend() noexcept { return {}; }
 
     void return_value(T value) noexcept { result = std::move(value); }
 
@@ -36,7 +36,7 @@ template <typename T> struct Task {
   Task &operator=(Task &&other) noexcept {
     if (this == &other)
       return *this;
-    if (_handle)
+    if (_handle && !_handle.done())
       _handle.destroy();
     _handle = other._handle;
     other._handle = {};
@@ -81,8 +81,8 @@ template <> struct Task<void> {
 
     Task get_return_object() { return Task{Handle::from_promise(*this)}; }
 
-    std::suspend_never initial_suspend() noexcept { return {}; }
-    std::suspend_never final_suspend() noexcept { return {}; }
+    std::suspend_always initial_suspend() noexcept { return {}; }
+    std::suspend_always final_suspend() noexcept { return {}; }
 
     void return_void() noexcept {}
 
@@ -103,7 +103,7 @@ template <> struct Task<void> {
   Task &operator=(Task &&other) noexcept {
     if (this == &other)
       return *this;
-    if (_handle)
+    if (_handle && !_handle.done())
       _handle.destroy();
     _handle = other._handle;
     other._handle = {};
@@ -111,7 +111,7 @@ template <> struct Task<void> {
   }
 
   ~Task() {
-    if (_handle)
+    if (_handle && !_handle.done())
       _handle.destroy();
   }
 
@@ -154,7 +154,7 @@ struct ErasedHandle {
   ErasedHandle &operator=(ErasedHandle &&other) noexcept {
     if (this == &other)
       return *this;
-    if (_handle)
+    if (_handle && !_handle.done())
       _handle.destroy();
     _handle = other._handle;
     other._handle = {};
@@ -178,6 +178,11 @@ struct ErasedHandle {
 
   explicit operator bool() const noexcept {
     return _handle.address() != nullptr;
+  }
+
+  ~ErasedHandle() {
+    // NOTE(Artur): the coroutine is already assumed to be destroyed, so don't
+    // clean up its resources
   }
 };
 

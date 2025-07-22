@@ -17,13 +17,21 @@
 #include "nic/icmp.hpp"
 
 #include "concurrency/executor.hpp"
+#include "concurrency/future.hpp"
 
 using namespace toad;
 
-toad::Task<void> sample() {
+toad::Task<void> future_setter(FutureHandle<int> future) {
+  spdlog::info("Setting the value...");
+  future.set_value(14);
+  spdlog::info("Value set!");
+  co_return;
+}
+
+toad::Task<void> sample(Future<int> future) {
   spdlog::info("Before");
-  co_await std::suspend_always{};
-  spdlog::info("After");
+  auto x = co_await future;
+  spdlog::info("After: {}", x);
 }
 
 int main(void) {
@@ -31,7 +39,10 @@ int main(void) {
   spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
 
   Executor executor;
-  executor.spawn(sample());
+  auto [future, handle] = Future<int>::make_future();
+  executor.spawn(sample(future));
+  executor.spawn(future_setter(handle));
+
   return 0;
 
   Device device =
