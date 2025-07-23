@@ -38,6 +38,16 @@ If you need to communicate with another thread consider using a `Future` or a `C
 
 ## Scheduling
 
+## IOContext
+
+### Linux
+
+On Linux [`io_uring`](https://man7.org/linux/man-pages/man7/io_uring.7.html) is a toolkit for batching asynchronous requests to the kernel. It's a big and complex magic bean. What matters is that it can minimize the amount of syscalls since every batch is a single call. Furthermore, it also can do some magic scheduling in the kernelspace to make it run even faster.
+
+`IOContext` has a `batch_size` and a `timeout_ms`. Both define a threshold for when the next batch should be submitted, either when `N` requests piled up or `T` units of time passed.
+
+Internally, it runs on a single thread to reduce the amount of synchronisation overhead. Because of that the hot path for handling requests does not contain any busywork mutexes or atomics.
+
 ## Further Reading
 
 If you have to write coroutines and awaitables, consider looking into...
