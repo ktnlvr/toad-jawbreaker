@@ -51,10 +51,10 @@ struct PendingReceive : PendingBase {
 struct IOContext {
   struct io_uring _ring;
 
-  u32 batch_size, timestamp_ms;
+  u32 batch_size, timeout_ms;
 
-  IOContext(u32 batch_size = 64, u32 timestamp_ms = 5)
-      : batch_size(batch_size), timestamp_ms(timestamp_ms) {
+  IOContext(u32 batch_size = 64, u32 timeout_ms = 5)
+      : batch_size(batch_size), timeout_ms(timeout_ms) {
     _this_io_context = this;
     if (io_uring_queue_init(64, &_ring, 0) < 0) {
       ASSERT(false, "Failed to init iouring.");
@@ -100,9 +100,7 @@ struct IOContext {
     // FIXME: check if already enqueued
     _pending_listeners[listener.sockfd] = pending;
 
-    // TODO: error handling
-    io_uring_submit(&_ring);
-    return future;
+    return std::move(future);
   }
 
   /// @returns Buffer of size max_size or smaller when data is received.
@@ -118,51 +116,74 @@ struct IOContext {
     sqe->user_data = (long long)pending;
     _pending_recv[socket._sockfd] = pending;
 
-    // TODO: error handling
-    io_uring_submit(&_ring);
-
-    return future;
+    return std::move(future);
   }
 
   void event_loop() {
+    struct __kernel_timespec ts;
+    ts.tv_sec = timeout_ms / 1000;
+    ts.tv_nsec = (timeout_ms % 1000) * 1000000;
+
+    std::vector<struct io_uring_cqe *> cqes(batch_size);
+
     // TODO: graceful shutdown
     while (true) {
-      struct io_uring_cqe *cqe;
-      int ret = io_uring_wait_cqe(&_ring, &cqe);
-      if (ret < 0) {
-        break;
+      io_uring_submit(&_ring);
+
+      int seen = 0;
+
+      {
+        struct io_uring_cqe *cqe;
+        // Wait for timeout or just one cqe
+        int ret = io_uring_wait_cqe_timeout(&_ring, &cqe, &ts);
+        if (ret < 0) {
+          if (ret == -ETIME) {
+            // no events arrived, just loop again
+            continue;
+          } else {
+            // fatal error
+            spdlog::error("io_uring_wait_cqe_timeout failed: {}", errno);
+            break;
+          }
+        }
+
+        cqes[seen++] = cqe;
       }
 
-      if (cqe->res < 0) {
-        spdlog::error("Error accepting!");
-        continue;
-      }
+      seen = io_uring_peek_batch_cqe(&_ring, cqes.data(), batch_size);
 
-      // TODO: check the pending kind
-      io_uring_cqe_seen(&_ring, cqe);
+      for (int i = 0; i < seen; i++) {
+        struct io_uring_cqe *cqe = cqes[i];
 
-      PendingBase *ptr = (PendingBase *)cqe->user_data;
-      if (ptr->kind == PendingKind::Listen) {
-        auto pending = (PendingListen *)ptr;
-        int client_fd = cqe->res;
-        spdlog::info("New connection client_fd={}", client_fd);
+        io_uring_cqe_seen(&_ring, cqe);
+        if (cqe->res < 0) {
+          spdlog::error("uring op failed: {}", errno);
+          continue;
+        }
 
-        auto socket = Socket(client_fd);
-        _pending_listeners.erase(pending->sockfd);
-        pending->handle.set_value(std::move(socket));
-      } else if (ptr->kind == PendingKind::Receive) {
-        auto pending = (PendingReceive *)ptr;
-        int client_fd = pending->sockfd;
+        PendingBase *ptr = (PendingBase *)cqe->user_data;
+        if (ptr->kind == PendingKind::Listen) {
+          auto pending = (PendingListen *)ptr;
+          int client_fd = cqe->res;
+          spdlog::info("New connection client_fd={}", client_fd);
 
-        // TODO: check if the socket closd
-        int read = cqe->res;
-        _pending_recv.erase(pending->sockfd);
-        spdlog::info("Read {} bytes from client_fd={}", read, client_fd);
+          auto socket = Socket(client_fd);
+          _pending_listeners.erase(pending->sockfd);
+          pending->handle.set_value(std::move(socket));
+        } else if (ptr->kind == PendingKind::Receive) {
+          auto pending = (PendingReceive *)ptr;
+          int client_fd = pending->sockfd;
 
-        std::optional<Buffer> value =
-            read == 0 ? std::nullopt
-                      : std::optional(std::move(pending->buffer.slice(read)));
-        pending->handle.set_value(std::move(value));
+          // TODO: check if the socket closd
+          int read = cqe->res;
+          _pending_recv.erase(pending->sockfd);
+          spdlog::info("Read {} bytes from client_fd={}", read, client_fd);
+
+          std::optional<Buffer> value =
+              read == 0 ? std::nullopt
+                        : std::optional(std::move(pending->buffer.slice(read)));
+          pending->handle.set_value(std::move(value));
+        }
       }
     }
   }

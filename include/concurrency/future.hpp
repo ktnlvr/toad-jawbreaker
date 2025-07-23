@@ -41,6 +41,8 @@ template <typename T> struct FutureHandle {
 
   void set_value(T &&value) {
     auto ptr = _state.lock();
+    if (ptr == nullptr)
+      return;
 
     const std::lock_guard<std::mutex> guard(ptr->_mutex);
 
@@ -63,11 +65,21 @@ template <typename T> struct Future {
 
   Future() : _state(std::make_shared<FutureState<T>>()) {}
 
+  Future(Future &&other) : _state(std::move(other._state)) {}
+  Future &operator=(Future &&other) {
+    if (&other == this)
+      return *this;
+    this->_state = std::move(other._state);
+  }
+
+  Future(const Future &) = delete;
+  Future &operator=(const Future &) = delete;
+
   static auto make_future() -> std::pair<Future<T>, FutureHandle<T>> {
     auto future = Future<T>();
     auto handle = FutureHandle<T>(future._state);
 
-    return std::make_pair(future, handle);
+    return {std::move(future), handle};
   }
 
   bool await_ready() noexcept { return _state->is_ready; }

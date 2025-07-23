@@ -62,7 +62,7 @@ int main(void) {
 
   Executor executor;
   auto [future, handle] = Future<int>::make_future();
-  executor.spawn(sample(future));
+  executor.spawn(sample(std::move(future)));
   executor.spawn(future_setter(handle));
 
   auto listener = io_ctx.new_listener(9955);
