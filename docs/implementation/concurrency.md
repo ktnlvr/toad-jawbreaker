@@ -7,7 +7,38 @@ Toad uses [C++20 Coroutines](https://en.cppreference.com/w/cpp/language/coroutin
 - *symmetric*, values can be passed back and forth
 - *stackful*, recursive suspension is allowed
 
+
 Coroutines themselves are a deep and complex topic which I don't find myself qualified enough to explain them, so I highly encourage looking at [Lewiss Baker's](https://lewissbaker.github.io/2017/09/25/coroutine-theory) before using them.
+
+## Broad Strokes
+
+To understand the concurrency model it should be sufficient to understand the 3 moving parts: `Executor`, `IOContext` and the `Futures`.
+
+The `Executor` is a thing that decides how the concurrent tasks will be executed. You can think of it as a task queue. You can add new tasks and different threads will come over to pick them and do them. 
+
+When writing a coroutine keep in mind that it might be given to a different thread between the suspension points. Don't rely on it unless you are doing something really specific.
+
+```cpp
+auto before = std::this_thread::get_id()
+
+// suspend itself into the queue
+co_await exec.sleep(0);                             
+
+auto after = std::this_thread::get_id();
+
+// 55400 55428
+spdlog::info("{} {}", before, after);
+```
+
+From that follows, that you shouldn't write thread-relient code. Do **NOT** use `std::mutex`, `std::condition_variable`, `std::yield` and others unless you know what you are doing. They will stall the thread and might fuck up the scheduling algorithm degrading performance.
+
+If you need to communicate with another thread consider using a `Future` or a `Channel`.
+
+## Channels
+
+## Scheduling
+
+## Further Reading
 
 If you have to write coroutines and awaitables, consider looking into...
 
