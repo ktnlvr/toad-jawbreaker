@@ -8,6 +8,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "../net/listener.hpp"
+#include "../net/socket.hpp"
+
 #include "future.hpp"
 
 namespace toad {
@@ -18,11 +21,7 @@ static IOContext *_this_io_context;
 
 auto this_io_context() -> IOContext & { return *_this_io_context; }
 
-struct Socket {
-  int _sockfd;
-};
-
-enum struct PendingKind { Listen };
+enum struct PendingKind { Listen, Receive };
 
 struct PendingBase {
   PendingKind kind;
@@ -38,33 +37,15 @@ struct PendingListen : PendingBase {
       : PendingBase(PendingKind::Listen), sockfd(sockfd), handle(handle) {}
 };
 
-struct Listener {
+struct PendingReceive : PendingBase {
   int sockfd;
-  u16 port;
+  FutureHandle<std::optional<Buffer>> handle;
+  Buffer buffer;
 
-  Listener() : sockfd(0), port(0) {}
-  Listener(int sockfd, u16 port) : sockfd(sockfd), port(port) {}
-
-  Listener(const Listener &) = delete;
-  Listener &operator=(const Listener &) = delete;
-
-  Listener(Listener &&other) {
-    sockfd = other.sockfd;
-    other.sockfd = 0;
-  }
-
-  Listener &operator=(Listener &&other) {
-    if (&other == this)
-      return *this;
-    sockfd = other.sockfd;
-    other.sockfd = 0;
-    return *this;
-  }
-
-  ~Listener() {
-    if (sockfd)
-      close(sockfd);
-  }
+  PendingReceive(int sockfd, Buffer buffer,
+                 FutureHandle<std::optional<Buffer>> handle)
+      : PendingBase(PendingKind::Receive), sockfd(sockfd), buffer(buffer),
+        handle(handle) {}
 };
 
 struct IOContext {
@@ -80,9 +61,8 @@ struct IOContext {
     }
   }
 
-  ~IOContext() { io_uring_queue_exit(&_ring); }
-
-  std::unordered_map<int, PendingBase *> _pending;
+  std::unordered_map<int, PendingListen *> _pending_listeners;
+  std::unordered_map<int, PendingReceive *> _pending_recv;
 
   // TODO: error handling
   auto new_listener(u16 port) -> Listener {
@@ -112,18 +92,40 @@ struct IOContext {
     // OPTIMIZE(Artur): maybe allocate these from some sort of ring/slab
     // allocator or hide the kind in the unused bits of the aligned ptr.
     // A lot of potential here
-    PendingBase *pending = new PendingListen(listener.sockfd, handle);
+    auto pending = new PendingListen(listener.sockfd, handle);
 
     struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
     io_uring_prep_accept(sqe, listener.sockfd, NULL, NULL, 0);
     sqe->user_data = (long long)pending;
     // FIXME: check if already enqueued
-    _pending[listener.sockfd] = pending;
+    _pending_listeners[listener.sockfd] = pending;
+
+    // TODO: error handling
     io_uring_submit(&_ring);
     return future;
   }
 
+  /// @returns Buffer of size max_size or smaller when data is received.
+  /// std::nullopt when the connection is shut down
+  Future<std::optional<Buffer>> submit_read_some(const Socket &socket,
+                                                 sz max_size) {
+    Buffer buffer(max_size);
+    auto [future, handle] = Future<std::optional<Buffer>>::make_future();
+    auto pending = new PendingReceive(socket._sockfd, buffer, handle);
+
+    struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
+    io_uring_prep_read(sqe, socket._sockfd, buffer.data(), max_size, 0);
+    sqe->user_data = (long long)pending;
+    _pending_recv[socket._sockfd] = pending;
+
+    // TODO: error handling
+    io_uring_submit(&_ring);
+
+    return future;
+  }
+
   void event_loop() {
+    // TODO: graceful shutdown
     while (true) {
       struct io_uring_cqe *cqe;
       int ret = io_uring_wait_cqe(&_ring, &cqe);
@@ -137,7 +139,6 @@ struct IOContext {
       }
 
       // TODO: check the pending kind
-
       io_uring_cqe_seen(&_ring, cqe);
 
       PendingBase *ptr = (PendingBase *)cqe->user_data;
@@ -146,15 +147,27 @@ struct IOContext {
         int client_fd = cqe->res;
         spdlog::info("New connection client_fd={}", client_fd);
 
-        auto socket = Socket{._sockfd = client_fd};
-        _pending.erase(pending->sockfd);
+        auto socket = Socket(client_fd);
+        _pending_listeners.erase(pending->sockfd);
         pending->handle.set_value(std::move(socket));
-      }
+      } else if (ptr->kind == PendingKind::Receive) {
+        auto pending = (PendingReceive *)ptr;
+        int client_fd = pending->sockfd;
 
-      // Re-arm the uring, apparently that's what it's called
-      io_uring_submit(&_ring);
+        // TODO: check if the socket closd
+        int read = cqe->res;
+        _pending_recv.erase(pending->sockfd);
+        spdlog::info("Read {} bytes from client_fd={}", read, client_fd);
+
+        std::optional<Buffer> value =
+            read == 0 ? std::nullopt
+                      : std::optional(std::move(pending->buffer.slice(read)));
+        pending->handle.set_value(std::move(value));
+      }
     }
   }
+
+  ~IOContext() { io_uring_queue_exit(&_ring); }
 };
 
 } // namespace toad

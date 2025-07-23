@@ -42,6 +42,15 @@ Task<void> client_acceptor(const Listener &listener) {
     spdlog::info("Waiting for a socket...");
     auto client = co_await io.submit_accept_ipv4(listener);
     spdlog::info("Omg! Got client, fd = {}", client._sockfd);
+
+    std::optional<Buffer> data = std::nullopt;
+    do {
+      data = co_await io.submit_read_some(client, 1);
+      if (!data.has_value())
+        spdlog::info("Terminating connection...");
+      else
+        spdlog::info("Received data: {}", data.value());
+    } while (data.has_value());
   }
 }
 

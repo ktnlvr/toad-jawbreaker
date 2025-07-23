@@ -21,6 +21,8 @@ template <typename T> struct FutureState {
   std::mutex _mutex = {};
   ErasedHandle continuation = {};
 
+  FutureState() : is_ready(false), _mutex(), continuation({}) {}
+
   ~FutureState() {}
 };
 
@@ -62,7 +64,7 @@ template <typename T> struct Future {
   Future() : _state(std::make_shared<FutureState<T>>()) {}
 
   static auto make_future() -> std::pair<Future<T>, FutureHandle<T>> {
-    auto future = Future();
+    auto future = Future<T>();
     auto handle = FutureHandle<T>(future._state);
 
     return std::make_pair(future, handle);
