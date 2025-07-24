@@ -75,8 +75,11 @@ struct Executor {
         _queue.pop_front();
       }
 
-      if (!handle.done())
+      if (!handle.done()) {
         handle.resume();
+        if (handle.done())
+          handle.destroy();
+      }
     }
 
     _this_executor = nullptr;
