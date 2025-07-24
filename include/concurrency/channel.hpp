@@ -111,7 +111,6 @@ template <typename T> struct TX {
         if (handle)
           this_executor().spawn(std::move(handle));
       }
-      spdlog::info("Destroyed {}", _channel->tx_count);
     }
   }
 };
