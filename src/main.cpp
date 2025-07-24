@@ -45,13 +45,16 @@ Task<void> client_acceptor(const Listener &listener) {
     auto client = co_await io.submit_accept_ipv4(listener);
     spdlog::info("Omg! Got client, fd = {}", client._sockfd);
 
-    std::optional<Buffer> data = std::nullopt;
+    auto rx = io.submit_read(client);
+
+    std::optional<u8> data;
     do {
-      data = co_await io.submit_read_some(client, 1);
-      if (!data.has_value())
+      data = co_await rx.recv();
+      if (data.has_value()) {
+        spdlog::info("Received byte: 0x{:02X}", data.value());
+      } else {
         spdlog::info("Terminating connection...");
-      else
-        spdlog::info("Received data: {}", data.value());
+      }
     } while (data.has_value());
   }
 }
@@ -82,17 +85,17 @@ int main(void) {
   spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
 
   IOContext io_ctx;
-
   Executor executor;
-  auto [future, handle] = Future<int>::make_future();
 
-  auto [tx, rx] = channel<u8>(256);
+  // Create a listener on port 8080
+  auto listener = io_ctx.new_listener(8080);
+  spdlog::info("Server listening on port 8080...");
 
-  spawn(channel_reader(std::move(rx)));
-  spawn(channel_writer(std::move(tx)));
+  // Spawn the client acceptor task
+  spawn(client_acceptor(listener));
 
-  while (true)
-    ;
+  // Run the event loop
+  io_ctx.event_loop();
 
   return 0;
 }
