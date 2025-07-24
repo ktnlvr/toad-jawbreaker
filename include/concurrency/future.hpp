@@ -21,7 +21,7 @@ template <typename T> struct FutureState {
   std::mutex _mutex = {};
   ErasedHandle continuation = {};
 
-  FutureState() : is_ready(false), _mutex(), continuation({}) {}
+  FutureState() : is_ready(false) {}
 
   ~FutureState() {}
 };

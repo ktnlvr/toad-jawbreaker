@@ -91,4 +91,6 @@ struct Executor {
   bool is_done = false;
 };
 
+void spawn(ErasedHandle &&handle) { this_executor().spawn(std::move(handle)); }
+
 } // namespace toad

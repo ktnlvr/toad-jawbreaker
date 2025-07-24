@@ -6,8 +6,7 @@ alias b := build
 
 build:
     mkdir -p build
-    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -fno-exceptions -lfmt -g -luring
-    sudo setcap cap_net_admin+ep ./build/main
+    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring
 
 run: build
     ./build/main

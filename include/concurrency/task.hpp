@@ -142,6 +142,8 @@ struct ErasedHandle {
     task._handle = {};
   }
 
+  ErasedHandle(std::coroutine_handle<> handle) : _handle(handle) {}
+
   ErasedHandle() noexcept : _handle({}) {}
 
   ErasedHandle(const ErasedHandle &other) = delete;

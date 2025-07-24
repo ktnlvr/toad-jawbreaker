@@ -16,6 +16,7 @@
 #include "nic/ethernet.hpp"
 #include "nic/icmp.hpp"
 
+#include "concurrency/channel.hpp"
 #include "concurrency/executor.hpp"
 #include "concurrency/future.hpp"
 #include "concurrency/iocontext.hpp"
@@ -54,6 +55,24 @@ Task<void> client_acceptor(const Listener &listener) {
   }
 }
 
+Task<void> channel_reader(RX<u8> &&rx) {
+  spdlog::info("Hello, world!");
+  std::optional<u8> result;
+  while (true) {
+    result = co_await rx.recv();
+    if (result.has_value())
+      spdlog::info("0x{:02X}", result.value());
+    else
+      break;
+  };
+}
+
+Task<void> channel_writer(TX<u8> &&tx) {
+  for (int i = 0; i < 256; i++)
+    tx.send(i);
+  co_return;
+}
+
 int main(void) {
   spdlog::set_level(spdlog::level::trace);
   spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
@@ -62,14 +81,14 @@ int main(void) {
 
   Executor executor;
   auto [future, handle] = Future<int>::make_future();
-  executor.spawn(sample(std::move(future)));
-  executor.spawn(future_setter(handle));
 
-  auto listener = io_ctx.new_listener(9955);
+  auto [tx, rx] = channel<u8>(256);
 
-  executor.spawn(client_acceptor(listener));
+  spawn(channel_reader(std::move(rx)));
+  spawn(channel_writer(std::move(tx)));
 
-  io_ctx.event_loop();
+  while (true)
+    ;
 
   return 0;
 
