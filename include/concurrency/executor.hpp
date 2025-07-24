@@ -29,12 +29,18 @@ struct Executor {
   }
 
   void spawn(ErasedHandle handle) {
-    if (handle.done())
+    void* addr = handle._handle.address();
+    spdlog::debug("Spawning coroutine at address: {}", addr);
+    
+    if (handle.done()) {
+      spdlog::debug("Coroutine at {} already done, not spawning", addr);
       return;
+    }
 
     {
       std::lock_guard lock(_mutex);
       _queue.emplace_back(std::move(handle));
+      spdlog::debug("Added coroutine at {} to queue (queue size: {})", addr, _queue.size());
     }
 
     // Wake up one thread to go and pick the task up

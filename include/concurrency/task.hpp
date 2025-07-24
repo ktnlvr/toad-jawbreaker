@@ -77,7 +77,11 @@ template <typename T> struct Task {
     return *std::move(_handle.promise().result);
   }
 
-  operator ErasedHandle() { return ErasedHandle(_handle); }
+  operator ErasedHandle() {
+    auto handle = ErasedHandle(_handle);
+    _handle = {};
+    return handle;
+  }
 
   typename promise_type::Handle _handle;
 };
@@ -142,7 +146,11 @@ template <> struct Task<void> {
       std::rethrow_exception(_handle.promise().exception);
   }
 
-  operator ErasedHandle() { return ErasedHandle(_handle); }
+  operator ErasedHandle() {
+    auto handle = ErasedHandle(_handle);
+    _handle = {}; // Transfer ownership
+    return handle;
+  }
 };
 
 template <typename T> using Handle = typename Task<T>::promise_type::Handle;

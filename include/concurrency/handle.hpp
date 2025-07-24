@@ -32,11 +32,55 @@ struct ErasedHandle {
   ErasedHandle(std::coroutine_handle<P> handle) noexcept
       : _handle(std::coroutine_handle<>::from_address(handle.address())) {}
 
-  void resume() const noexcept { _handle.resume(); }
+  void resume() const noexcept {
+    if (!_handle) {
+      spdlog::error("Attempting to resume null handle");
+      return;
+    }
 
-  bool done() const noexcept { return _handle.done(); }
+    void *addr = _handle.address();
+    spdlog::debug("Resuming coroutine at address: {}", addr);
 
-  void destroy() noexcept { _handle.destroy(); }
+    uintptr_t ptr = reinterpret_cast<uintptr_t>(addr);
+    if (ptr < 0x1000 || ptr > 0x7fffffffffff) {
+      spdlog::warn("Coroutine handle has suspicious address: 0x{:x}", ptr);
+      return;
+    }
+
+    // Check if coroutine is already done before resuming
+    if (_handle.done()) {
+      spdlog::warn("Attempting to resume already done coroutine at {}", addr);
+      return;
+    }
+
+    _handle.resume();
+    spdlog::debug("Successfully resumed coroutine at address: {}", addr);
+  }
+
+  bool done() const noexcept {
+    if (_handle.address() == nullptr)
+      return true;
+
+    try {
+      return _handle.done();
+    } catch (...) {
+      spdlog::error("Exception in done() check for handle at {}",
+                    _handle.address());
+      return true; // Assume it's done if we can't check
+    }
+  }
+
+  void destroy() noexcept {
+    void *addr = _handle.address();
+    spdlog::debug("Destroying coroutine at address: {}", addr);
+    if (addr != nullptr) {
+      _handle.destroy();
+      _handle = {};
+      spdlog::debug("Successfully destroyed coroutine at address: {}", addr);
+    } else {
+      spdlog::warn("Attempted to destroy null coroutine handle");
+    }
+  }
 
   template <typename Promise>
   std::coroutine_handle<Promise> as() const noexcept {
