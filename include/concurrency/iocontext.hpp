@@ -68,7 +68,7 @@ struct IOContext {
   IOContext(u32 batch_size = 64, u32 timeout_ms = 5)
       : batch_size(batch_size), timeout_ms(timeout_ms) {
     _this_io_context = this;
-    if (io_uring_queue_init(64, &_ring, 0) < 0) {
+    if (io_uring_queue_init(batch_size, &_ring, 0) < 0) {
       ASSERT(false, "Failed to init iouring.");
     }
   }
