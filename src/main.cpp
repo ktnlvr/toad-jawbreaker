@@ -82,7 +82,7 @@ Task<void> channel_writer(TX<u8> &&tx) {
 
 int main(void) {
   spdlog::set_level(spdlog::level::trace);
-  spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%n] [thread %t] %v");
+  spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%L] [thread %t] %v");
 
   IOContext io_ctx;
   Executor executor;
