@@ -55,7 +55,6 @@ template <typename T> struct recv_awaiter {
 
   std::optional<T> await_resume() {
     // Either we were resumed because someone pushed or there are no more TXs
-
     if (result.has_value())
       return result;
     if (_channel->_ring.size() > 0)
@@ -112,6 +111,7 @@ template <typename T> struct TX {
         if (handle)
           this_executor().spawn(std::move(handle));
       }
+      spdlog::info("Destroyed {}", _channel->tx_count);
     }
   }
 };

@@ -5,6 +5,8 @@
 #include <exception>
 #include <optional>
 
+#include "executor.hpp"
+
 namespace toad {
 
 template <typename T> struct Task {
@@ -53,7 +55,11 @@ template <typename T> struct Task {
       typename promise_type::Handle _handle;
       bool await_ready() noexcept { return false; }
 
-      void await_suspend(std::coroutine_handle<>) noexcept {}
+      bool await_suspend(std::coroutine_handle<> handle) noexcept {
+        // TODO: schedule the task back
+        spawn(ErasedHandle(handle));
+        return true;
+      }
 
       T await_resume() {
         if (_handle.promise().exception)
@@ -70,6 +76,8 @@ template <typename T> struct Task {
       std::rethrow_exception(_handle.promise().exception);
     return *std::move(_handle.promise().result);
   }
+
+  operator ErasedHandle() { return ErasedHandle(_handle); }
 
   typename promise_type::Handle _handle;
 };
@@ -133,59 +141,8 @@ template <> struct Task<void> {
     if (_handle.promise().exception)
       std::rethrow_exception(_handle.promise().exception);
   }
-};
 
-struct ErasedHandle {
-  std::coroutine_handle<> _handle;
-
-  template <typename T> ErasedHandle(Task<T> task) : _handle(task._handle) {
-    task._handle = {};
-  }
-
-  ErasedHandle(std::coroutine_handle<> handle) : _handle(handle) {}
-
-  ErasedHandle() noexcept : _handle({}) {}
-
-  ErasedHandle(const ErasedHandle &other) = delete;
-  ErasedHandle &operator=(const ErasedHandle &) = delete;
-
-  ErasedHandle(ErasedHandle &&other) : _handle(other._handle) {
-    other._handle = {};
-  }
-
-  ErasedHandle &operator=(ErasedHandle &&other) noexcept {
-    if (this == &other)
-      return *this;
-    if (_handle && !_handle.done())
-      _handle.destroy();
-    _handle = other._handle;
-    other._handle = {};
-    return *this;
-  }
-
-  template <typename P>
-  ErasedHandle(std::coroutine_handle<P> handle) noexcept
-      : _handle(std::coroutine_handle<>::from_address(handle.address())) {}
-
-  void resume() const noexcept { _handle.resume(); }
-
-  bool done() const noexcept { return _handle.done(); }
-
-  void destroy() noexcept { _handle.destroy(); }
-
-  template <typename Promise>
-  std::coroutine_handle<Promise> as() const noexcept {
-    return std::coroutine_handle<Promise>::from_address(_handle.address());
-  }
-
-  explicit operator bool() const noexcept {
-    return _handle.address() != nullptr;
-  }
-
-  ~ErasedHandle() {
-    // NOTE(Artur): the coroutine is already assumed to be destroyed, so don't
-    // clean up its resources
-  }
+  operator ErasedHandle() { return ErasedHandle(_handle); }
 };
 
 template <typename T> using Handle = typename Task<T>::promise_type::Handle;
