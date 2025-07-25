@@ -37,7 +37,7 @@ int main(void) {
   spawn(std::move(server).serve_socks5());
 
   // Run the event loop
-  io_ctx.event_loop();
+  spawn_blocking([&]() { io_ctx.event_loop(); });
 
   return 0;
 }
