@@ -50,7 +50,7 @@ template <> struct formatter<toad::Buffer> {
   constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
   template <typename FormatContext>
-  auto format(const toad::Buffer &f, FormatContext &ctx) {
+  auto format(const toad::Buffer &f, FormatContext &ctx) const {
     auto out = ctx.out();
     for (toad::sz i = 0; i < f.size; i++)
       // TODO: fix trailing whitespace
