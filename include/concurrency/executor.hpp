@@ -21,7 +21,7 @@ auto this_executor() -> Executor & {
 }
 
 struct Executor {
-  Executor(sz num_threads = 1) {
+  Executor(sz num_threads = std::thread::hardware_concurrency()) {
     _this_executor = this;
     _threads.reserve(num_threads);
     for (sz i = 0; i < num_threads; i++)
@@ -29,9 +29,9 @@ struct Executor {
   }
 
   void spawn(ErasedHandle handle) {
-    void* addr = handle._handle.address();
+    void *addr = handle._handle.address();
     spdlog::debug("Spawning coroutine at address: {}", addr);
-    
+
     if (handle.done()) {
       spdlog::debug("Coroutine at {} already done, not spawning", addr);
       return;
@@ -40,7 +40,8 @@ struct Executor {
     {
       std::lock_guard lock(_mutex);
       _queue.emplace_back(std::move(handle));
-      spdlog::debug("Added coroutine at {} to queue (queue size: {})", addr, _queue.size());
+      spdlog::debug("Added coroutine at {} to queue (queue size: {})", addr,
+                    _queue.size());
     }
 
     // Wake up one thread to go and pick the task up
