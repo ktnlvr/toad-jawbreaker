@@ -24,6 +24,21 @@
 
 using namespace toad;
 
+Task<void> client_reader(const Socket &&sock) {
+  IOContext &io = this_io_context();
+  auto rx = io.submit_read(sock);
+
+  std::optional<u8> data;
+  do {
+    data = co_await rx.recv();
+    if (data.has_value()) {
+      spdlog::info("Received byte: 0x{:02X}", data.value());
+    } else {
+      spdlog::info("Terminating connection...");
+    }
+  } while (data.has_value());
+}
+
 Task<void> client_acceptor(const Listener &listener) {
   IOContext &io = this_io_context();
 
@@ -32,17 +47,7 @@ Task<void> client_acceptor(const Listener &listener) {
     auto client = co_await io.submit_accept_ipv4(listener);
     spdlog::info("Omg! Got client, fd = {}", client._sockfd);
 
-    auto rx = io.submit_read(client);
-
-    std::optional<u8> data;
-    do {
-      data = co_await rx.recv();
-      if (data.has_value()) {
-        spdlog::info("Received byte: 0x{:02X}", data.value());
-      } else {
-        spdlog::info("Terminating connection...");
-      }
-    } while (data.has_value());
+    spawn(client_reader(std::move(client)));
   }
 }
 
