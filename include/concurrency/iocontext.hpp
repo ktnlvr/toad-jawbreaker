@@ -246,11 +246,6 @@ struct IOContext {
         struct io_uring_cqe *cqe = cqes[i];
 
         io_uring_cqe_seen(&_ring, cqe);
-        if (cqe->res < 0) {
-          spdlog::error("uring op failed: {} {}", cqe->res, errno);
-          continue;
-        }
-
         auto pending = (PendingVariant *)cqe->user_data;
         bool keep_alive = std::visit(
             [&](auto &pending) { return _handle_pending(cqe, pending); },
