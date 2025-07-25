@@ -55,7 +55,7 @@ template <typename T> struct FutureHandle {
         expected, true, std::memory_order_release, std::memory_order_relaxed);
     ASSERT(did_set, "Attempt to set already-set future");
 
-    new (&ptr->_value) T(value);
+    new (&ptr->_value) T(std::move(value));
     this_executor().spawn(std::move(ptr->continuation));
   }
 };
