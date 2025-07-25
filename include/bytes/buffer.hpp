@@ -20,12 +20,17 @@ struct Buffer {
   Buffer(Buffer &&buf) = default;
   Buffer &operator=(Buffer &&buf) = default;
 
-  Buffer(u8 *ptr, sz size)
-      : _shared(std::shared_ptr<u8[]>(new u8[size])), size(size), _offset(0) {
-    std::memcpy(_shared.get(), ptr, size);
+  template <sz size>
+  explicit Buffer(std::span<u8, size> span)
+      : _shared(std::shared_ptr<u8[]>(new u8[size])), size(span.size()),
+        _offset(0) {
+    std::memcpy(_shared.get(), span.data(), span.size());
   }
 
-  Buffer(sz size)
+  explicit Buffer(u8 *ptr, sz size)
+      : _shared(std::shared_ptr<u8[]>(ptr)), size(size), _offset(0) {}
+
+  explicit Buffer(sz size)
       : _shared(std::shared_ptr<u8[]>(new u8[size])), size(size), _offset(0) {
     std::memset(data(), 0, size);
   }
