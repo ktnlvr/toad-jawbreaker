@@ -43,6 +43,12 @@ Task<void> client_reader(const Socket &&sock) {
 Task<void> client_acceptor(const Listener &listener) {
   IOContext &io = this_io_context();
 
+  IPv4 ip({127, 0, 0, 1});
+  auto sock = co_await io.submit_connect_ipv4(ip, 1234);
+
+  auto buf = co_await io.submit_read_some(sock, 100);
+  spdlog::info("Got data from connect={}", buf.value());
+
   while (true) {
     spdlog::info("Waiting for a socket...");
     auto client = co_await io.submit_accept_ipv4(listener);

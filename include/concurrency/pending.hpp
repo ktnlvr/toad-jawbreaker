@@ -17,6 +17,16 @@ struct PendingListen {
       : sockfd(sockfd), handle(handle) {}
 };
 
+struct PendingConnect {
+  int sockfd;
+  struct sockaddr_in addr;
+  FutureHandle<Socket> handle;
+
+  PendingConnect(int sockfd, struct sockaddr_in addr,
+                 FutureHandle<Socket> handle)
+      : sockfd(sockfd), addr(addr), handle(handle) {}
+};
+
 struct PendingReadSome {
   int sockfd;
   FutureHandle<std::optional<Buffer>> handle;
@@ -68,7 +78,7 @@ struct PendingWriteSome {
   }
 };
 
-using PendingVariant =
-    std::variant<PendingRead, PendingReadSome, PendingListen, PendingWriteSome>;
+using PendingVariant = std::variant<PendingRead, PendingReadSome, PendingListen,
+                                    PendingConnect, PendingWriteSome>;
 
 }; // namespace toad

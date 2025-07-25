@@ -75,6 +75,29 @@ struct IOContext {
     return std::move(future);
   }
 
+  Future<Socket> submit_connect_ipv4(const IPv4 ip, u16 port) {
+    auto [future, handle] = Future<Socket>::make_future();
+
+    int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    memcpy(&addr.sin_addr.s_addr, ip.data(), 4);
+
+    PendingVariant *pending =
+        new PendingVariant(PendingConnect(sockfd, addr, handle));
+    PendingConnect &connect = std::get<PendingConnect>(*pending);
+
+    struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
+    io_uring_prep_connect(sqe, sockfd, (struct sockaddr *)&connect.addr,
+                          sizeof(addr));
+    sqe->user_data = (long long)pending;
+
+    return std::move(future);
+  }
+
   /// @returns Buffer of size max_size or smaller when data is received.
   /// std::nullopt when the connection is shut down
   Future<std::optional<Buffer>> submit_read_some(const Socket &socket,
@@ -111,7 +134,6 @@ struct IOContext {
 
   template <sz spansize>
   void submit_write_some(const Socket &socket, std::span<u8, spansize> buffer) {
-
     sz size = buffer.size();
     u8 *buf = new u8[size];
     memcpy(buf, buffer.data(), size);
@@ -143,6 +165,17 @@ struct IOContext {
         sqe->user_data = cqe->user_data;
         return true;
       }
+    }
+
+    return false;
+  }
+
+  bool _handle_pending(struct io_uring_cqe *cqe, PendingConnect &connect) {
+    if (cqe->res < 0) {
+      spdlog::error("Connect failed, code={}", errno);
+    } else {
+      auto socket = Socket(connect.sockfd);
+      connect.handle.set_value(std::move(socket));
     }
 
     return false;
@@ -214,7 +247,7 @@ struct IOContext {
 
         io_uring_cqe_seen(&_ring, cqe);
         if (cqe->res < 0) {
-          spdlog::error("uring op failed: {}", errno);
+          spdlog::error("uring op failed: {} {}", cqe->res, errno);
           continue;
         }
 
