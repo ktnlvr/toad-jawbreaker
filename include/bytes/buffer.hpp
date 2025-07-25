@@ -14,6 +14,12 @@ struct Buffer {
 
   Buffer() : _shared{}, _offset(0), size(0) {}
 
+  Buffer(const Buffer &buf) = default;
+  Buffer &operator=(const Buffer &buf) = default;
+
+  Buffer(Buffer &&buf) = default;
+  Buffer &operator=(Buffer &&buf) = default;
+
   Buffer(u8 *ptr, sz size)
       : _shared(std::shared_ptr<u8[]>(new u8[size])), size(size), _offset(0) {
     std::memcpy(_shared.get(), ptr, size);

@@ -37,7 +37,38 @@ struct PendingRead {
       : sockfd(sockfd), tx(std::move(tx)), active(true) {}
 };
 
+struct PendingWriteSome {
+  int sockfd;
+  u8 *buffer;
+
+  PendingWriteSome(int sockfd, u8 *buffer) : sockfd(sockfd), buffer(buffer) {}
+
+  PendingWriteSome(const PendingWriteSome &pw) = delete;
+  PendingWriteSome &operator=(const PendingWriteSome &pw) = delete;
+
+  PendingWriteSome(PendingWriteSome &&pw) : sockfd(pw.sockfd) {
+    this->buffer = pw.buffer;
+    pw.buffer = nullptr;
+  }
+
+  PendingWriteSome &operator=(PendingWriteSome &&pw) {
+    if (this == &pw)
+      return *this;
+
+    this->sockfd = pw.sockfd;
+    this->buffer = pw.buffer;
+    pw.buffer = nullptr;
+
+    return *this;
+  }
+
+  ~PendingWriteSome() {
+    if (buffer)
+      delete buffer;
+  }
+};
+
 using PendingVariant =
-    std::variant<PendingRead, PendingReadSome, PendingListen>;
+    std::variant<PendingRead, PendingReadSome, PendingListen, PendingWriteSome>;
 
 }; // namespace toad

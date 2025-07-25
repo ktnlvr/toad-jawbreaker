@@ -33,6 +33,7 @@ Task<void> client_reader(const Socket &&sock) {
     data = co_await rx.recv();
     if (data.has_value()) {
       spdlog::info("Received byte: 0x{:02X}", data.value());
+      io.submit_write_some(sock, std::span(&data.value(), 1));
     } else {
       spdlog::info("Terminating connection...");
     }

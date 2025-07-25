@@ -37,8 +37,6 @@ struct IOContext {
     }
   }
 
-  std::unordered_set<PendingVariant *> _pending;
-
   // TODO: error handling
   auto new_listener(u16 port) -> Listener {
     int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -74,9 +72,6 @@ struct IOContext {
     io_uring_prep_accept(sqe, listener.sockfd, NULL, NULL, 0);
     sqe->user_data = (long long)pending;
 
-    // TODO: assert if already enqueued
-    _pending.insert(pending);
-
     return std::move(future);
   }
 
@@ -92,7 +87,6 @@ struct IOContext {
     struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
     io_uring_prep_read(sqe, socket._sockfd, buffer.data(), max_size, 0);
     sqe->user_data = (long long)pending;
-    _pending.insert(pending);
 
     return std::move(future);
   }
@@ -111,9 +105,23 @@ struct IOContext {
     io_uring_prep_read(sqe, socket._sockfd, read.buffer.data(),
                        read.buffer.size(), 0);
     sqe->user_data = (long long)pending;
-    _pending.insert(pending);
 
     return std::move(rx);
+  }
+
+  template <sz spansize>
+  void submit_write_some(const Socket &socket, std::span<u8, spansize> buffer) {
+
+    sz size = buffer.size();
+    u8 *buf = new u8[size];
+    memcpy(buf, buffer.data(), size);
+
+    PendingVariant *pending =
+        new PendingVariant(PendingWriteSome(socket._sockfd, buf));
+
+    struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
+    io_uring_prep_write(sqe, socket._sockfd, buf, size, 0);
+    sqe->user_data = (long long)pending;
   }
 
   bool _handle_pending(struct io_uring_cqe *cqe, PendingRead &read) {
@@ -163,6 +171,13 @@ struct IOContext {
     return false;
   }
 
+  bool _handle_pending(struct io_uring_cqe *cqe, PendingWriteSome &write_some) {
+    if (cqe->res < 0)
+      spdlog::error("Write broke, code={}", errno);
+
+    return false;
+  }
+
   void event_loop() {
     struct __kernel_timespec ts;
     ts.tv_sec = timeout_ms / 1000;
@@ -190,8 +205,6 @@ struct IOContext {
             break;
           }
         }
-
-        cqes[seen++] = cqe;
       }
 
       seen = io_uring_peek_batch_cqe(&_ring, cqes.data(), batch_size);
@@ -211,7 +224,6 @@ struct IOContext {
             *pending);
 
         if (!keep_alive) {
-          _pending.erase(pending);
           delete pending;
         }
       }
