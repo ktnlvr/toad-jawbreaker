@@ -24,19 +24,6 @@
 
 using namespace toad;
 
-toad::Task<void> future_setter(FutureHandle<int> future) {
-  spdlog::info("Setting the value...");
-  future.set_value(14);
-  spdlog::info("Value set!");
-  co_return;
-}
-
-toad::Task<void> sample(Future<int> future) {
-  spdlog::info("Before");
-  auto x = co_await future;
-  spdlog::info("After: {}", x);
-}
-
 Task<void> client_acceptor(const Listener &listener) {
   IOContext &io = this_io_context();
 
@@ -57,27 +44,6 @@ Task<void> client_acceptor(const Listener &listener) {
       }
     } while (data.has_value());
   }
-}
-
-Task<void> channel_reader(RX<u8> &&rx) {
-  spdlog::info("Hello, world!");
-  std::optional<u8> result;
-  while (true) {
-    result = co_await rx.recv();
-    if (result.has_value())
-      spdlog::info("0x{:02X}", result.value());
-    else
-      break;
-  };
-  spdlog::info("Done, shutting down!");
-}
-
-Task<void> channel_writer(TX<u8> &&tx) {
-  spdlog::info("Started writing!");
-  for (int i = 0; i < 256; i++)
-    tx.send(i);
-  spdlog::info("Writing over!");
-  co_return;
 }
 
 int main(void) {
