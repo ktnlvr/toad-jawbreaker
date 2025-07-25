@@ -22,41 +22,9 @@
 #include "concurrency/iocontext.hpp"
 #include "concurrency/task.hpp"
 
+#include "socks5/server.hpp"
+
 using namespace toad;
-
-Task<void> client_reader(const Socket &&sock) {
-  IOContext &io = this_io_context();
-  auto rx = io.submit_read(sock);
-
-  std::optional<u8> data;
-  do {
-    data = co_await rx.recv();
-    if (data.has_value()) {
-      spdlog::info("Received byte: 0x{:02X}", data.value());
-      io.submit_write_some(sock, std::span(&data.value(), 1));
-    } else {
-      spdlog::info("Terminating connection...");
-    }
-  } while (data.has_value());
-}
-
-Task<void> client_acceptor(const Listener &listener) {
-  IOContext &io = this_io_context();
-
-  IPv4 ip({127, 0, 0, 1});
-  auto sock = co_await io.submit_connect_ipv4(ip, 1234);
-
-  auto buf = co_await io.submit_read_some(sock, 100);
-  spdlog::info("Got data from connect={}", buf.value());
-
-  while (true) {
-    spdlog::info("Waiting for a socket...");
-    auto client = co_await io.submit_accept_ipv4(listener);
-    spdlog::info("Omg! Got client, fd = {}", client._sockfd);
-
-    spawn(client_reader(std::move(client)));
-  }
-}
 
 int main(void) {
   spdlog::set_level(spdlog::level::trace);
@@ -65,12 +33,8 @@ int main(void) {
   IOContext io_ctx;
   Executor executor;
 
-  // Create a listener on port 8080
-  auto listener = io_ctx.new_listener(8080);
-  spdlog::info("Server listening on port 8080...");
-
-  // Spawn the client acceptor task
-  spawn(client_acceptor(listener));
+  socks5::Socks5Server server;
+  spawn(std::move(server).serve_socks5());
 
   // Run the event loop
   io_ctx.event_loop();
