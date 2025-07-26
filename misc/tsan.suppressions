@@ -1,0 +1,4 @@
+# SAFETY(Artur): The calls to io_uring have implicit sync and 
+# there are memory barriers to protect from any stupid behaviour.
+race:toad::IOContext::submit_accept_ipv4
+race:toad::IOContext::event_loop

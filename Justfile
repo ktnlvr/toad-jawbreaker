@@ -5,10 +5,10 @@ default:
 alias b := build
 build:
     mkdir -p build
-    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring
+    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring -fsanitize=thread
 
 run: build
-    ./build/main
+    TSAN_OPTIONS="suppressions=./misc/tsan.suppressions" ./build/main
 
 alias ds := docs-serve
 docs-serve:
