@@ -17,6 +17,14 @@ template <typename T> struct Channel {
   ErasedHandle continuation{};
 
   explicit Channel(size_t capacity) : _ring(capacity) {}
+
+  Channel(const Channel &other) = delete;
+  Channel &operator=(const Channel &other) = delete;
+
+  Channel(Channel &&other) = delete;
+  Channel &operator=(Channel &&other) = delete;
+
+  ~Channel() {}
 };
 
 template <typename T> struct recv_awaiter {

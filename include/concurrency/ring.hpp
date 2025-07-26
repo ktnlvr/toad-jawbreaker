@@ -16,6 +16,12 @@ template <typename T> struct Ring {
 
   explicit Ring(sz capacity = 1024) {}
 
+  Ring(const Ring &other) = delete;
+  Ring &operator=(const Ring &other) = delete;
+
+  Ring(Ring &&other) = delete;
+  Ring &operator=(Ring &&other) = delete;
+
   auto pop() -> T {
     std::lock_guard guard(_mutex);
     T value = std::move(_data.front());
