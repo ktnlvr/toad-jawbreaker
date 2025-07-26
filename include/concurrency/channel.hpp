@@ -77,10 +77,8 @@ template <typename T> struct TX {
   TX(TX &&other) noexcept : _channel(std::exchange(other._channel, nullptr)) {}
 
   TX &operator=(TX &&other) noexcept {
-    if (this != &other) {
-      this->~TX();
-      _channel = std::exchange(other._channel, nullptr);
-    }
+    if (this != &other)
+      _channel = std::move(other._channel);
     return *this;
   }
 
