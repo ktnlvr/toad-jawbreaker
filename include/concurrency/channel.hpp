@@ -27,8 +27,9 @@ template <typename T> struct recv_awaiter {
       : _channel(channel), result(std::nullopt) {}
 
   bool await_ready() {
-    if (_channel->_ring.size() > 0) {
-      result = _channel->_ring.pop();
+    auto popped = _channel->_ring.try_pop();
+    if (popped.has_value()) {
+      result = popped;
       return true;
     }
 
@@ -57,8 +58,10 @@ template <typename T> struct recv_awaiter {
     // Either we were resumed because someone pushed or there are no more TXs
     if (result.has_value())
       return result;
-    if (_channel->_ring.size() > 0)
-      return _channel->_ring.pop();
+    
+    auto popped = _channel->_ring.try_pop();
+    if (popped.has_value())
+      return popped;
 
     // no more senders, give up
     return std::nullopt;

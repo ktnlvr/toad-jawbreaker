@@ -23,6 +23,16 @@ template <typename T> struct Ring {
     return std::move(value);
   }
 
+  auto try_pop() -> std::optional<T> {
+    std::lock_guard guard(_mutex);
+    if (_data.empty()) {
+      return std::nullopt;
+    }
+    T value = std::move(_data.front());
+    _data.pop_front();
+    return value;
+  }
+
   void push(const T &value) {
     std::lock_guard guard(_mutex);
     _data.push_back(value);
