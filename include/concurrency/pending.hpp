@@ -74,7 +74,7 @@ struct PendingWriteSome {
 
   ~PendingWriteSome() {
     if (buffer)
-      delete buffer;
+      delete[] buffer;
   }
 };
 
