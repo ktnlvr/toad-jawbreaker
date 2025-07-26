@@ -224,8 +224,13 @@ struct IOContext {
 
     std::vector<struct io_uring_cqe *> cqes(batch_size);
 
+    // SAFETY(Artur): TSan might trick you into thinking that here is a
+    // datarace. There isn't. The memory fence makes sure that all the reads
+    // have finished. Seems correct to me.
+
     // TODO: graceful shutdown
     while (true) {
+      std::atomic_thread_fence(std::memory_order_release);
       io_uring_submit(&_ring);
 
       int seen = 0;
@@ -248,6 +253,7 @@ struct IOContext {
 
       seen = io_uring_peek_batch_cqe(&_ring, cqes.data(), batch_size);
 
+      std::atomic_thread_fence(std::memory_order_acquire);
       for (int i = 0; i < seen; i++) {
         struct io_uring_cqe *cqe = cqes[i];
 
