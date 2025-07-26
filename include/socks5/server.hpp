@@ -139,7 +139,7 @@ struct Socks5Server {
       auto reader = io.submit_read(client);
       while (true) {
         auto value = co_await reader.recv();
-        if (value.has_value())
+        if (!value.has_value())
           break;
         tx.send(std::move(value.value()));
       }
