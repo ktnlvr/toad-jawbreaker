@@ -21,8 +21,8 @@ struct Socks5Server {
         if (buffer.size < 2)
           continue;
 
-        u8 version = buffer.data()[0];
-        u8 method_count = buffer.data()[1];
+        u8 version = buffer[0];
+        u8 method_count = buffer[1];
 
         if (version != 5) {
           spdlog::warn(
@@ -42,7 +42,7 @@ struct Socks5Server {
         bool is_ok = false;
         for (u8 i = 0; i < method_count; i++)
           // Allow no authentication
-          if (methods.data()[i] == 0x00)
+          if (methods[i] == 0x00)
             is_ok = true;
 
         if (!is_ok) {
@@ -57,6 +57,59 @@ struct Socks5Server {
         // the connection is trusted
         spdlog::info(
             "Trusted connection established, can do some real work now");
+
+        auto command_data = co_await io.submit_read_some(client, 4);
+        if (!command_data)
+          continue;
+        auto command = command_data.value();
+
+        if (command[0] != 0x05) // only version 5 supported
+          continue;
+        if (command[1] != 0x01) // only "CONNECT" is supported
+          continue;
+        auto atype = command[3];
+
+        std::variant<IPv4, std::string> address;
+        switch (atype) {
+        case 0x01: { // IPv4
+          auto buffer_data = co_await io.submit_read_some(client, 4);
+          if (!buffer_data)
+            continue;
+          auto b = buffer_data.value();
+          auto ip = IPv4({b[0], b[1], b[2], b[3]});
+          address = ip;
+          break;
+        }
+
+        break;
+        case 0x03: { // Domain Name
+          auto domain_name_length_data =
+              co_await io.submit_read_some(client, 1);
+
+          if (!domain_name_length_data)
+            continue;
+
+          // TODO(Artur): add better reading methods I beg
+          auto domain_name_length = domain_name_length_data.value()[0];
+
+          auto domain_name_data =
+              co_await io.submit_read_some(client, domain_name_length);
+          if (!domain_name_data)
+            continue;
+          auto domain_name = domain_name_data.value();
+
+          auto domain =
+              std::string((const char *)domain_name.data(), domain_name_length);
+
+          address = domain;
+        } break;
+        case 0x04: // IPv6
+          spdlog::error("IPv6 not supported, sorry");
+          break;
+        default:
+          spdlog::error("Unknown address type 0x{:02X}", atype);
+          continue;
+        }
       }
     }
   }

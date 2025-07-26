@@ -76,16 +76,10 @@ struct IOContext {
     return std::move(future);
   }
 
-  Future<Socket> submit_connect_ipv4(const IPv4 ip, u16 port) {
+  Future<Socket> _submit_connect(struct sockaddr_in addr) {
     auto [future, handle] = Future<Socket>::make_future();
 
     int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr.s_addr, ip.data(), 4);
 
     PendingVariant *pending =
         new PendingVariant(PendingConnect(sockfd, addr, handle));
@@ -97,6 +91,15 @@ struct IOContext {
     sqe->user_data = (long long)pending;
 
     return std::move(future);
+  }
+
+  Future<Socket> submit_connect_ipv4(const IPv4 ip, u16 port) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    memcpy(&addr.sin_addr.s_addr, ip.data(), 4);
+    return _submit_connect(addr);
   }
 
   /// @returns Buffer of size max_size or smaller when data is received.
@@ -132,6 +135,8 @@ struct IOContext {
 
     return std::move(rx);
   }
+
+  // TODO: read fixed
 
   template <sz spansize>
   void submit_write_some(const Socket &socket, std::span<u8, spansize> buffer) {
