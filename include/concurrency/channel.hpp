@@ -58,7 +58,7 @@ template <typename T> struct recv_awaiter {
     // Either we were resumed because someone pushed or there are no more TXs
     if (result.has_value())
       return result;
-    
+
     auto popped = _channel->_ring.try_pop();
     if (popped.has_value())
       return popped;
@@ -100,18 +100,14 @@ template <typename T> struct TX {
   }
 
   ~TX() {
-    if (_channel) {
-      if (_channel->tx_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        ErasedHandle handle;
+    if (!_channel)
+      return;
 
-        {
-          std::lock_guard guard(_channel->mutex);
-          handle = std::move(_channel->continuation);
-        }
-
-        if (handle)
-          this_executor().spawn(std::move(handle));
-      }
+    std::lock_guard guard(_channel->mutex);
+    if (_channel->tx_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+      ErasedHandle handle = std::move(_channel->continuation);
+      if (handle)
+        this_executor().spawn(std::move(handle));
     }
   }
 };
@@ -131,6 +127,7 @@ template <typename T> struct RX {
 
   ~RX() {
     if (_channel) {
+      std::lock_guard guard(_channel->mutex);
       _channel->rx_exists.store(false, std::memory_order_release);
     }
   }
