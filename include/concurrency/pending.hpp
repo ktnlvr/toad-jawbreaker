@@ -34,7 +34,7 @@ struct PendingReadSomeVec {
 
   PendingReadSomeVec(int sockfd, std::vector<u8> &vec, sz initial_size,
                      FutureHandle<sz> handle)
-      : sockfd(sockfd), vec(vec), handle(handle) {}
+      : sockfd(sockfd), vec(vec), handle(handle), initial_size(initial_size) {}
 };
 
 struct PendingReadSome {
