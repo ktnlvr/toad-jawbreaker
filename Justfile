@@ -10,7 +10,7 @@ build:
 run: build
     ./build/main
 
-scaffold-star-run nodes='2': 
+scaffold-star nodes='2': 
     mkdir -p ./build/
     curl -C - https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-virt-3.22.1-x86_64.iso -o build/alpine.iso
     python3 scripts/scaffold-star.py {{nodes}}
