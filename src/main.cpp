@@ -16,11 +16,7 @@
 #include "nic/ethernet.hpp"
 #include "nic/icmp.hpp"
 
-#include "concurrency/channel.hpp"
-#include "concurrency/executor.hpp"
-#include "concurrency/future.hpp"
-#include "concurrency/iocontext.hpp"
-#include "concurrency/task.hpp"
+#include "concurrency.hpp"
 
 #include "socks5/server.hpp"
 

@@ -5,7 +5,7 @@ default:
 alias b := build
 build:
     mkdir -p build
-    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring -fsanitize=thread
+    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring -fsanitize=address
 
 run: build
     TSAN_OPTIONS="suppressions=./misc/tsan.suppressions" ./build/main

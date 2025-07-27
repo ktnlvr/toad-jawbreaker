@@ -13,7 +13,6 @@
 #include "../net/listener.hpp"
 #include "../net/socket.hpp"
 
-#include "channel.hpp"
 #include "future.hpp"
 #include "pending.hpp"
 
@@ -118,25 +117,25 @@ struct IOContext {
     return std::move(future);
   }
 
-  /// @returns RX<u8> channel for continuous reading from socket
-  RX<u8> submit_read(const Socket &socket) {
-    auto [tx, rx] = channel<u8>(8192);
+  Future<sz> submit_read_some(const Socket &socket, std::vector<u8> &vec,
+                              sz max_size) {
+    auto [future, handle] = Future<sz>::make_future();
 
-    PendingVariant *pending =
-        new PendingVariant(PendingRead(socket._sockfd, std::move(tx)));
-
-    // SAFETY(Artur): we just stored it, so we can be 100% sure its that type
-    PendingRead &read = std::get<PendingRead>(*pending);
+    sz initial_size = vec.size();
+    PendingVariant *pending = new PendingVariant(
+        PendingReadSomeVec(socket._sockfd, vec, initial_size, handle));
 
     struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
-    io_uring_prep_read(sqe, socket._sockfd, read.buffer.data(),
-                       read.buffer.size(), 0);
+
+    // resize the vector to accomodate all the element in the future.
+    // we will shrink it back afterwards.
+    vec.resize(initial_size + max_size);
+    io_uring_prep_read(sqe, socket._sockfd, vec.data() + initial_size, max_size,
+                       0);
+
     sqe->user_data = (long long)pending;
-
-    return std::move(rx);
+    return std::move(future);
   }
-
-  // TODO: read fixed
 
   template <sz spansize>
   void submit_write_some(const Socket &socket, std::span<u8, spansize> buffer) {
@@ -150,30 +149,6 @@ struct IOContext {
     struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
     io_uring_prep_write(sqe, socket._sockfd, buf, size, 0);
     sqe->user_data = (long long)pending;
-  }
-
-  bool _handle_pending(struct io_uring_cqe *cqe, PendingRead &read) {
-    int client_fd = read.sockfd;
-    int bytes_read = cqe->res;
-
-    if (bytes_read > 0 && read.active) {
-      for (int i = 0; i < bytes_read; i++) {
-        if (!read.tx.send(std::move(read.buffer[i]))) {
-          read.active = false;
-          break;
-        }
-      }
-
-      if (read.active) {
-        struct io_uring_sqe *sqe = io_uring_get_sqe(&_ring);
-        io_uring_prep_read(sqe, client_fd, read.buffer.data(),
-                           read.buffer.size(), 0);
-        sqe->user_data = cqe->user_data;
-        return true;
-      }
-    }
-
-    return false;
   }
 
   bool _handle_pending(struct io_uring_cqe *cqe, PendingConnect &connect) {
@@ -198,6 +173,19 @@ struct IOContext {
         read == 0 ? std::nullopt
                   : std::optional(std::move(read_some.buffer.slice(read)));
     read_some.handle.set_value(std::move(value));
+    return false;
+  }
+
+  bool _handle_pending(struct io_uring_cqe *cqe,
+                       PendingReadSomeVec &read_some) {
+    int client_fd = read_some.sockfd;
+
+    // TODO: check if the socket closed
+    int read = cqe->res;
+    spdlog::info("Read {} bytes from client_fd={}", read, client_fd);
+    read_some.vec.resize(read_some.initial_size + read);
+
+    read_some.handle.set_value(std::move(read));
     return false;
   }
 

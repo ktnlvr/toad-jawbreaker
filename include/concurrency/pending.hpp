@@ -4,7 +4,6 @@
 
 #include "../bytes/buffer.hpp"
 #include "../net/socket.hpp"
-#include "channel.hpp"
 #include "future.hpp"
 
 namespace toad {
@@ -27,6 +26,17 @@ struct PendingConnect {
       : sockfd(sockfd), addr(addr), handle(handle) {}
 };
 
+struct PendingReadSomeVec {
+  int sockfd;
+  FutureHandle<sz> handle;
+  std::vector<u8> &vec;
+  sz initial_size;
+
+  PendingReadSomeVec(int sockfd, std::vector<u8> &vec, sz initial_size,
+                     FutureHandle<sz> handle)
+      : sockfd(sockfd), vec(vec), handle(handle) {}
+};
+
 struct PendingReadSome {
   int sockfd;
   FutureHandle<std::optional<Buffer>> handle;
@@ -35,16 +45,6 @@ struct PendingReadSome {
   PendingReadSome(int sockfd, Buffer buffer,
                   FutureHandle<std::optional<Buffer>> handle)
       : sockfd(sockfd), buffer(buffer), handle(handle) {}
-};
-
-struct PendingRead {
-  int sockfd;
-  TX<u8> tx;
-  std::array<u8, 4096> buffer;
-  bool active;
-
-  PendingRead(int sockfd, TX<u8> tx)
-      : sockfd(sockfd), tx(std::move(tx)), active(true) {}
 };
 
 struct PendingWriteSome {
@@ -78,7 +78,8 @@ struct PendingWriteSome {
   }
 };
 
-using PendingVariant = std::variant<PendingRead, PendingReadSome, PendingListen,
-                                    PendingConnect, PendingWriteSome>;
+using PendingVariant =
+    std::variant<PendingReadSome, PendingListen, PendingConnect,
+                 PendingWriteSome, PendingReadSomeVec>;
 
 }; // namespace toad

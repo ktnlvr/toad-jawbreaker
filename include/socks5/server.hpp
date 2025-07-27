@@ -123,45 +123,8 @@ struct Socks5Server {
       auto &ipv4 = std::get<IPv4>(address);
       auto server = co_await io.submit_connect_ipv4(ipv4, port);
 
-      service_connection(std::move(client), std::move(server));
+      spdlog::info("Reception logic done, terminating connection");
     }
-  }
-
-  void service_connection(Socket &&client, Socket &&server) {
-    spdlog::info("Servicing connection!");
-
-    auto [tx, rx] = channel<u8>(4096);
-
-    auto reader = [tx = std::move(tx),
-                   client = std::move(client)]() mutable -> Task<void> {
-      IOContext &io = this_io_context();
-
-      auto reader = io.submit_read(client);
-      while (true) {
-        auto value = co_await reader.recv();
-        if (!value.has_value())
-          break;
-        tx.send(std::move(value.value()));
-      }
-    }();
-
-    auto writer = [rx = std::move(rx),
-                   server = std::move(server)]() mutable -> Task<void> {
-      IOContext &io = this_io_context();
-
-      while (true) {
-        auto value = co_await rx.recv();
-        if (!value.has_value())
-          break;
-
-        std::array<u8, 1> data;
-        data[0] = value.value();
-        io.submit_write_some(server, std::span(data));
-      }
-    }();
-
-    spawn(reader);
-    spawn(writer);
   }
 };
 

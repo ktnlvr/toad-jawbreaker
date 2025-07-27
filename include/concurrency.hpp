@@ -1,4 +1,3 @@
-#include "concurrency/channel.hpp"
 #include "concurrency/executor.hpp"
 #include "concurrency/future.hpp"
 #include "concurrency/handle.hpp"
