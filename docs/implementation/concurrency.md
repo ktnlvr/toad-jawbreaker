@@ -34,11 +34,11 @@ From that follows, that you shouldn't write thread-relient code. Do **NOT** use 
 
 If you need to communicate with another thread consider using a `Future` or a `Channel`.
 
-## Channels
-
 ## Scheduling
 
 ## IOContext
+
+`IOContext` is the abstraction over OS's async capabilities. It's usually interacted with using the `submit_*` function family. Each function schedules the respective operation to be resolved some time in the future. The data passed is considered *radioactive* until the respective awaitable returns. If a function immediately returns the data is safe. 
 
 ### Linux
 
