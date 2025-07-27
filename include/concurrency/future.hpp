@@ -23,7 +23,10 @@ template <typename T> struct FutureState {
 
   FutureState() : is_ready(false) {}
 
-  ~FutureState() {}
+  ~FutureState() {
+    if (!is_ready)
+      _value.~T();
+  }
 };
 
 template <typename T> struct FutureHandle {
