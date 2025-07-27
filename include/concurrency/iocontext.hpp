@@ -37,7 +37,8 @@ struct IOContext {
     }
   }
 
-  // TODO: error handling
+  /// @brief Creates a new listener at 0.0.0.0:port
+  /// @param port The port to listen at
   auto new_listener(u16 port) -> Listener {
     int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
@@ -59,6 +60,9 @@ struct IOContext {
     return Listener(sockfd, port);
   }
 
+  /// @brief Wait for a @ref listener to accept a new client
+  /// @param listener
+  /// @return The socket of a new freshly connected client
   Future<Socket> submit_accept_ipv4(const Listener &listener) {
     auto [future, handle] = Future<Socket>::make_future();
 
@@ -75,6 +79,8 @@ struct IOContext {
     return std::move(future);
   }
 
+  /// @brief Generic handler for connecting a bare socket
+  /// @returns
   Future<Socket> _submit_connect(struct sockaddr_in addr) {
     auto [future, handle] = Future<Socket>::make_future();
 
