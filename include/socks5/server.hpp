@@ -121,9 +121,14 @@ struct Socks5Server {
       spdlog::info("Connecting at port {}", port);
 
       auto &ipv4 = std::get<IPv4>(address);
-      auto server = co_await io.submit_connect_ipv4(ipv4, port);
+      auto server_response = co_await io.submit_connect_ipv4(ipv4, port);
+      if (!server_response) {
+        spdlog::error("Connecting to {} failed", ipv4);
+        continue;
+      }
 
-      spdlog::info("Reception logic done, terminating connection");
+      spdlog::info("Reception logic done, terminating connection. Real handler "
+                   "would take off from here.");
     }
   }
 };

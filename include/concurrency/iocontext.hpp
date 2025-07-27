@@ -81,8 +81,8 @@ struct IOContext {
 
   /// @brief Generic handler for connecting a bare socket
   /// @returns
-  Future<Socket> _submit_connect(struct sockaddr_in addr) {
-    auto [future, handle] = Future<Socket>::make_future();
+  Future<std::optional<Socket>> _submit_connect(struct sockaddr_in addr) {
+    auto [future, handle] = Future<std::optional<Socket>>::make_future();
 
     int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
@@ -98,7 +98,9 @@ struct IOContext {
     return std::move(future);
   }
 
-  Future<Socket> submit_connect_ipv4(const IPv4 ip, u16 port) {
+  /// @brief Start connecting to an IPv4 address.
+  /// @returns A connected socket if successful, a std::nullopt if not
+  Future<std::optional<Socket>> submit_connect_ipv4(const IPv4 ip, u16 port) {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -160,6 +162,7 @@ struct IOContext {
   bool _handle_pending(struct io_uring_cqe *cqe, PendingConnect &connect) {
     if (cqe->res < 0) {
       spdlog::error("Connect failed, code={}", errno);
+      connect.handle.set_value(std::nullopt);
     } else {
       auto socket = Socket(connect.sockfd);
       connect.handle.set_value(std::move(socket));

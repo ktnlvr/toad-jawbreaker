@@ -19,10 +19,10 @@ struct PendingListen {
 struct PendingConnect {
   int sockfd;
   struct sockaddr_in addr;
-  FutureHandle<Socket> handle;
+  FutureHandle<std::optional<Socket>> handle;
 
   PendingConnect(int sockfd, struct sockaddr_in addr,
-                 FutureHandle<Socket> handle)
+                 FutureHandle<std::optional<Socket>> handle)
       : sockfd(sockfd), addr(addr), handle(handle) {}
 };
 
