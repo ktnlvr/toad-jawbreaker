@@ -43,7 +43,8 @@ struct Buffer {
 
   u8 *data() const { return _shared.get() + _offset; }
   auto size() const -> sz { return _size; }
-  auto operator[](sz idx) -> u8 { return data()[idx]; }
+  auto operator[](sz idx) -> u8 & { return data()[idx]; }
+  auto operator[](sz idx) const -> const u8 & { return data()[idx]; }
 
   auto slice(sz length) -> Buffer { return slice(0, length); }
 

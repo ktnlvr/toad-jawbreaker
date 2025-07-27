@@ -13,7 +13,7 @@ template <typename B>
 concept ByteBuffer = requires(B buffer, sz idx) {
   { buffer.size() } -> std::same_as<sz>;
   { buffer.data() } -> std::same_as<u8 *>;
-  { buffer[idx] } -> std::same_as<u8>;
+  { buffer[idx] } -> std::same_as<u8 &>;
 };
 
 // NOTE(Artur): one might think that this works with a forward iterator, but
