@@ -42,7 +42,8 @@ struct Arp {
       : sender_hardware_addr(sha), target_hardware_addr(tha),
         sender_protocol_addr(spa), target_protocol_addr(tpa), oper(oper) {}
 
-  static auto try_from_stream(ByteIStream &bytes) -> Arp {
+  template <ByteBuffer B>
+  static auto try_from_stream(ByteIStream<B> &bytes) -> Arp {
     Arp ret;
 
     u16 parsed_htype, parsed_ptype;
@@ -67,7 +68,7 @@ struct Arp {
     return ret;
   }
 
-  void try_to_stream(ByteOStream &bytes) {
+  template <ByteBuffer B> void try_to_stream(ByteOStream<B> &bytes) {
     bytes.write_u16(htype)
         .write_u16(ptype)
         .write_u8(hlen)

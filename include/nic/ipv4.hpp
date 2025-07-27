@@ -44,7 +44,7 @@ template <TypestateDirection direction> struct Ip {
     // TODO: handle options
     return 0;
   }
-  auto payload_size() -> sz { return payload.size; }
+  auto payload_size() -> sz { return payload._size; }
 
   auto size() -> sz {
     return header_size() + header_dynamic_size() + payload_size();
@@ -60,7 +60,7 @@ template <TypestateDirection direction> struct Ip {
         protocol(ip.protocol), header_checksum(ip.header_checksum), src(ip.src),
         dst(ip.dst) {}
 
-  static Ip try_from_stream(ByteIStream &stream) {
+  template <ByteBuffer B> static Ip try_from_stream(ByteIStream<B> &stream) {
     Ip ret;
 
     u8 version_ihl;
@@ -96,7 +96,7 @@ template <TypestateDirection direction> struct Ip {
     return ret;
   }
 
-  void try_to_stream(ByteOStream &stream) const {
+  template <ByteBuffer B> void try_to_stream(ByteOStream<B> &stream) const {
     stream.write_u8((version << 4) | ihl)
         .write_u8((dscp << 2) | ecn)
         .write_u16(total_length)
@@ -130,14 +130,14 @@ template <TypestateDirection direction> struct Ip {
 
   auto buffer_size() const -> sz {
     // TODO(Artur): respect optional data
-    return IP_HEADER_SIZE + payload.size;
+    return IP_HEADER_SIZE + payload._size;
   }
 
   checksum calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
     Buffer buffer(padded_buffer_size);
-    auto ostream = ByteOStream(buffer);
+    auto ostream = ByteOStream<Buffer>(buffer);
     try_to_stream(ostream);
 
     // Zero out the place where the checksum would be
@@ -145,11 +145,11 @@ template <TypestateDirection direction> struct Ip {
     buffer.data()[10] = 0;
     buffer.data()[11] = 0;
 
-    return checksum({buffer.data(), buffer.size});
+    return checksum({buffer.data(), buffer._size});
   }
 };
 
-static_assert(Packet<Ip<DirectionIn>>);
+static_assert(Packet<Ip<DirectionIn>, Buffer>);
 
 } // namespace toad
 

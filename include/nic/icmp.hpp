@@ -25,7 +25,7 @@ template <TypestateDirection direction> struct Icmp {
 
   static constexpr auto header_size() -> sz { return 8; }
   auto header_dynamic_size() -> sz { return 0; }
-  auto payload_size() -> sz { return payload.size; }
+  auto payload_size() -> sz { return payload._size; }
 
   auto size() -> sz {
     return header_size() + header_dynamic_size() + payload_size();
@@ -38,7 +38,7 @@ template <TypestateDirection direction> struct Icmp {
       : type(icmp.type), code(icmp.code), checksum(icmp.checksum),
         rest(icmp.rest), payload(icmp.payload) {}
 
-  static Icmp try_from_stream(ByteIStream &stream) {
+  template <ByteBuffer B> static Icmp try_from_stream(ByteIStream<B> &stream) {
     Icmp ret;
 
     stream.read_u8((u8 *)&ret.type)
@@ -58,7 +58,7 @@ template <TypestateDirection direction> struct Icmp {
     return ret;
   }
 
-  void try_to_stream(ByteOStream &bytes) const {
+  template <ByteBuffer B> void try_to_stream(ByteOStream<B> &bytes) const {
     bytes.write_u8((u8)type)
         .write_u8(code)
         .write_u16(checksum)
@@ -66,13 +66,13 @@ template <TypestateDirection direction> struct Icmp {
         .write_buffer(payload);
   }
 
-  sz buffer_size() const { return 1 + 1 + 2 + rest.size() + payload.size; }
+  sz buffer_size() const { return 1 + 1 + 2 + rest.size() + payload._size; }
 
   toad::checksum calculate_checksum() const {
     // NOTE(Artur): Round up to a multiple of two, required by the spec
     sz padded_buffer_size = (buffer_size() + 1) & ~1;
     Buffer buffer(padded_buffer_size);
-    auto ostream = ByteOStream(buffer);
+    auto ostream = ByteOStream<Buffer>(buffer);
     try_to_stream(ostream);
 
     // Zero out the place where the checksum would be
@@ -80,7 +80,7 @@ template <TypestateDirection direction> struct Icmp {
     buffer.data()[2] = 0;
     buffer.data()[3] = 0;
 
-    return toad::checksum({buffer.data(), buffer.size});
+    return toad::checksum({buffer.data(), buffer._size});
   }
 
   auto clone_as_echo_response() const -> Icmp<~direction> {
@@ -95,7 +95,7 @@ template <TypestateDirection direction> struct Icmp {
   }
 };
 
-static_assert(Packet<Icmp<DirectionIn>>);
+static_assert(Packet<Icmp<DirectionIn>, Buffer>);
 
 } // namespace toad
 

@@ -136,7 +136,7 @@ struct Device {
 
   auto write_eth(EthernetFrame<DirectionOut> &frame) {
     Buffer buffer(maximum_transmission_unit);
-    auto ostream = ByteOStream(buffer);
+    auto ostream = ByteOStream<Buffer>(buffer);
     frame.try_to_stream(ostream);
     sz packet_length = ostream.cursor;
     ssz n = write(fd, buffer.data(), packet_length);

@@ -21,7 +21,7 @@ struct Socks5Server {
         continue;
       auto buffer = std::move(data.value());
 
-      if (buffer.size < 2)
+      if (buffer._size < 2)
         continue;
 
       u8 version = buffer[0];

@@ -23,7 +23,7 @@ template <TypestateDirection direction> struct EthernetFrame {
 
   static constexpr auto header_size() -> sz { return 14; }
   auto header_dynamic_size() -> sz { return 0; }
-  auto payload_size() -> sz { return payload.size; }
+  auto payload_size() -> sz { return payload._size; }
 
   auto size() -> sz {
     return header_size() + header_dynamic_size() + payload_size();
@@ -36,7 +36,8 @@ template <TypestateDirection direction> struct EthernetFrame {
 
   static const sz DST_SRC_ETHETYPE_SZ = 6 + 6 + 2;
 
-  static auto try_from_stream(ByteIStream &bytes) -> EthernetFrame {
+  template <ByteBuffer B>
+  static auto try_from_stream(ByteIStream<B> &bytes) -> EthernetFrame {
     EthernetFrame frame;
 
     bytes.read_array(&frame.dst)
@@ -50,10 +51,10 @@ template <TypestateDirection direction> struct EthernetFrame {
   }
 
   auto min_buffer_size() -> sz const {
-    return 2 * sizeof(MAC) + 2 + payload.size;
+    return 2 * sizeof(MAC) + 2 + payload._size;
   }
 
-  void try_to_stream(ByteOStream &stream) {
+  template <ByteBuffer B> void try_to_stream(ByteOStream<B> &stream) {
     stream.write_array(dst).write_array(src).write_u16(ethertype).write_buffer(
         payload);
   }
@@ -71,7 +72,7 @@ template <TypestateDirection direction> struct EthernetFrame {
   }
 };
 
-static_assert(Packet<EthernetFrame<DirectionIn>>);
+static_assert(Packet<EthernetFrame<DirectionIn>, Buffer>);
 
 } // namespace toad
 
