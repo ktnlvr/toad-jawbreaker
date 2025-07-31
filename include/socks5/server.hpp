@@ -19,9 +19,7 @@ struct Socks5Server {
     }
   }
 
-  Task<void> handle_client_handshake(Socket _client) {
-    Socket client = std::move(_client);
-
+  Task<void> handle_client_handshake(Socket client) {
     IOContext &io = this_io_context();
 
     std::vector<u8> buffer;
@@ -104,6 +102,48 @@ struct Socks5Server {
       spdlog::error("Unknown address type 0x{:02X}", atype);
       co_return;
     }
+
+    co_await io.submit_read_some(client, buffer, 2);
+
+    u16 port;
+    istream.read_u16(&port);
+
+    spdlog::debug("{}", buffer);
+
+    auto ipv4 = std::get<IPv4>(address);
+    auto maybe_remote_connection = co_await handle_connection(ipv4, port);
+    if (!maybe_remote_connection) {
+      spdlog::error("Failed to establish a connection with the remote {}:{}",
+                    ipv4, port);
+      co_return;
+    }
+
+    auto remote = std::move(maybe_remote_connection.value());
+
+    spawn(client_to_remote(client, remote));
+    spawn(remote_to_client(client, remote));
+
+    spdlog::info("Now transmitting!");
+    spdlog::info("Transmission over!");
+  }
+
+  Future<std::optional<Socket>> handle_connection(const IPv4 &target,
+                                                  u16 port) {
+    IOContext &io = this_io_context();
+
+    spdlog::info("Connecting to {}:{}", target, port);
+
+    return io.submit_connect_ipv4(target, port);
+  }
+
+  Task<void> client_to_remote(const Socket &client, const Socket &remote) {
+    spdlog::info("Client -> Remote done");
+    co_return;
+  }
+
+  Task<void> remote_to_client(const Socket &client, const Socket &remote) {
+    spdlog::info("Remote -> Client done");
+    co_return;
   }
 };
 
