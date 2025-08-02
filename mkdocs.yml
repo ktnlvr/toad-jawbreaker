@@ -1,3 +1,5 @@
 site_name: Toad Jawbreaker
 theme:
   name: readthedocs
+plugins:
+  - mermaid2
