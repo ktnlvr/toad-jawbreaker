@@ -21,6 +21,14 @@ auto this_executor() -> Executor & {
 }
 
 struct Executor {
+  std::vector<std::thread> _threads;
+  std::deque<Task> _queue;
+
+  std::mutex _mutex;
+  std::condition_variable _condvar;
+
+  bool is_done = false;
+
   Executor(sz num_threads = std::thread::hardware_concurrency()) {
     _this_executor = this;
     _threads.reserve(num_threads);
@@ -47,8 +55,6 @@ struct Executor {
     // Wake up one thread to go and pick the task up
     _condvar.notify_one();
   }
-
-  // todo: spawn_blocking();
 
   Executor(const Executor &) = delete;
   Executor(Executor &&) = delete;
@@ -94,16 +100,24 @@ struct Executor {
 
     _this_executor = nullptr;
   }
-
-  std::vector<std::thread> _threads;
-  std::deque<Task> _queue;
-
-  std::mutex _mutex;
-  std::condition_variable _condvar;
-
-  bool is_done = false;
 };
 
 void spawn(Task &&task) { this_executor().spawn(std::move(task)); }
+
+auto suspend(int times = 1) {
+  struct suspend_awaitable {
+    int times = 0;
+
+    bool await_ready() { return times == 0; };
+    void await_resume() {};
+    void await_suspend(Handle handle) {
+      spdlog::info("Suspended...");
+      times--;
+      spawn(Task(handle));
+    };
+  };
+
+  return suspend_awaitable{times};
+}
 
 } // namespace toad

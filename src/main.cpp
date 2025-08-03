@@ -11,6 +11,7 @@ Task worker1(Notify &notify) {
 
 Task worker2(Notify &notify) {
   spdlog::info("Worker 2! Before notify");
+  co_await suspend();
   co_await notify;
   spdlog::info("Worker 2! After notify");
 }
@@ -30,9 +31,11 @@ int main(void) {
 
   Notify notify;
 
-  executor.spawn(worker1(notify));
-  executor.spawn(worker2(notify));
-  executor.spawn(producer(notify));
+  for (int i = 0; i < 100; i++) {
+    executor.spawn(worker1(notify));
+    executor.spawn(worker2(notify));
+    executor.spawn(producer(notify));
+  }
 
   notify.wait_blocking();
 
