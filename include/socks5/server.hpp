@@ -120,10 +120,11 @@ struct Socks5Server {
 
     auto remote = std::move(maybe_remote_connection.value());
 
+    spdlog::info("Now transmitting!");
+
     spawn(client_to_remote(client, remote));
     spawn(remote_to_client(client, remote));
 
-    spdlog::info("Now transmitting!");
     spdlog::info("Transmission over!");
   }
 

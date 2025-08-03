@@ -1,6 +1,5 @@
 #pragma once
 
-#include <any>
 #include <coroutine>
 #include <exception>
 #include <optional>
@@ -15,11 +14,21 @@ template <typename T> struct Task {
 
     std::optional<T> result;
     std::exception_ptr exception;
+    std::coroutine_handle<> continuation;
 
     Task get_return_object() { return Task(Handle::from_promise(*this)); }
 
     std::suspend_always initial_suspend() noexcept { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
+
+    auto final_suspend() noexcept {
+      struct FinalAwaiter : std::suspend_always {
+        void await_suspend(promise_type::Handle h) noexcept {
+          if (h.promise().continuation)
+            h.promise().continuation.resume();
+        }
+      };
+      return FinalAwaiter{};
+    }
 
     void return_value(T value) noexcept { result = std::move(value); }
 
@@ -46,41 +55,50 @@ template <typename T> struct Task {
   }
 
   ~Task() {
-    if (_handle && !_handle.done())
+    if (_handle)
       _handle.destroy();
   }
 
-  auto operator co_await() & noexcept {
+  auto operator co_await() && noexcept {
     struct Awaiter {
       typename promise_type::Handle _handle;
+
       bool await_ready() noexcept { return false; }
 
       bool await_suspend(std::coroutine_handle<> handle) noexcept {
-        // TODO: schedule the task back
-        spawn(ErasedHandle(handle));
+        _handle.promise().continuation = handle;
+        spawn(_handle);
         return true;
       }
 
       T await_resume() {
         if (_handle.promise().exception)
           std::rethrow_exception(_handle.promise().exception);
-        return *std::move(_handle.promise().result);
+        T tmp = *std::move(_handle.promise().result);
+        _handle.promise().result.reset();
+        return tmp;
+      }
+
+      ~Awaiter() {
+        if (_handle)
+          _handle.destroy();
       }
     };
 
-    return Awaiter{_handle};
+    return Awaiter{std::exchange(_handle, nullptr)};
   }
 
   T get() {
     if (_handle.promise().exception)
       std::rethrow_exception(_handle.promise().exception);
-    return *std::move(_handle.promise().result);
+    auto tmp = *std::move(_handle.promise().result);
+    _handle.promise().result.reset();
+    return tmp;
   }
 
-  operator ErasedHandle() {
-    auto handle = ErasedHandle(_handle);
-    _handle = {};
-    return handle;
+  operator ErasedHandle() && {
+    auto tmp = std::exchange(_handle, nullptr);
+    return ErasedHandle(tmp);
   }
 
   typename promise_type::Handle _handle;
@@ -90,11 +108,21 @@ template <> struct Task<void> {
   struct promise_type {
     using Handle = std::coroutine_handle<promise_type>;
     std::exception_ptr exception;
+    std::coroutine_handle<> continuation;
 
     Task get_return_object() { return Task{Handle::from_promise(*this)}; }
 
     std::suspend_always initial_suspend() noexcept { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
+
+    auto final_suspend() noexcept {
+      struct FinalAwaiter : std::suspend_always {
+        void await_suspend(promise_type::Handle h) noexcept {
+          if (h.promise().continuation)
+            h.promise().continuation.resume();
+        }
+      };
+      return FinalAwaiter{};
+    }
 
     void return_void() noexcept {}
 
@@ -123,22 +151,30 @@ template <> struct Task<void> {
   }
 
   ~Task() {
-    if (_handle && !_handle.done())
+    if (_handle)
       _handle.destroy();
   }
 
-  auto operator co_await() & noexcept {
+  auto operator co_await() && noexcept {
     struct Awaiter {
       Handle _handle;
       bool await_ready() noexcept { return false; }
-      void await_suspend(std::coroutine_handle<>) noexcept {}
+      void await_suspend(std::coroutine_handle<> handle) noexcept {
+        _handle.promise().continuation = handle;
+        spawn(_handle);
+      }
 
       void await_resume() {
         if (_handle.promise().exception)
           std::rethrow_exception(_handle.promise().exception);
       }
+
+      ~Awaiter() {
+        if (_handle)
+          _handle.destroy();
+      }
     };
-    return Awaiter{_handle};
+    return Awaiter{std::exchange(_handle, nullptr)};
   }
 
   void get() {
@@ -146,10 +182,8 @@ template <> struct Task<void> {
       std::rethrow_exception(_handle.promise().exception);
   }
 
-  operator ErasedHandle() {
-    auto handle = ErasedHandle(_handle);
-    _handle = {}; // Transfer ownership
-    return handle;
+  operator ErasedHandle() && {
+    return ErasedHandle(std::exchange(_handle, nullptr));
   }
 };
 
