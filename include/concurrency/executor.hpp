@@ -4,7 +4,7 @@
 #include <thread>
 
 #include "../defs.hpp"
-#include "handle.hpp"
+#include "task.hpp"
 
 namespace toad {
 
@@ -28,18 +28,18 @@ struct Executor {
       _threads.emplace_back([this]() { this->worker_thread(); });
   }
 
-  void spawn(ErasedHandle handle) {
-    void *addr = handle._handle.address();
+  void spawn(Task task) {
+    void *addr = task.handle_.address();
     spdlog::debug("Spawning coroutine at address: {}", addr);
 
-    if (handle.done()) {
+    if (task.done()) {
       spdlog::debug("Coroutine at {} already done, not spawning", addr);
       return;
     }
 
     {
       std::lock_guard lock(_mutex);
-      _queue.emplace_back(std::move(handle));
+      _queue.emplace_back(std::move(task));
       spdlog::debug("Added coroutine at {} to queue (queue size: {})", addr,
                     _queue.size());
     }
@@ -68,7 +68,7 @@ struct Executor {
     _this_executor = this;
 
     while (true) {
-      ErasedHandle handle;
+      Task task;
       {
         std::unique_lock lock(_mutex);
         _condvar.wait(lock, [this] { return is_done || !_queue.empty(); });
@@ -78,14 +78,17 @@ struct Executor {
         if (_queue.empty())
           continue;
 
-        handle = std::move(_queue.front());
+        task = std::move(_queue.front());
         _queue.pop_front();
       }
 
-      if (!handle.done()) {
-        handle.resume();
-        if (handle.done())
-          handle.destroy();
+      if (!task.done()) {
+        task.resume();
+
+        // SAFETY(Artur): If the coroutine is done we know that nothing else
+        // will ever reschedule it again, so we can simply own it and destroy.
+        if (!task.done())
+          task.leak();
       }
     }
 
@@ -93,7 +96,7 @@ struct Executor {
   }
 
   std::vector<std::thread> _threads;
-  std::deque<ErasedHandle> _queue;
+  std::deque<Task> _queue;
 
   std::mutex _mutex;
   std::condition_variable _condvar;
@@ -101,6 +104,6 @@ struct Executor {
   bool is_done = false;
 };
 
-void spawn(ErasedHandle &&handle) { this_executor().spawn(std::move(handle)); }
+void spawn(Task &&task) { this_executor().spawn(std::move(task)); }
 
 } // namespace toad

@@ -8,197 +8,85 @@
 
 namespace toad {
 
-template <typename T> struct Task {
+struct Task;
+
+void spawn(Task &&task);
+
+struct Task {
   struct promise_type {
-    using Handle = std::coroutine_handle<promise_type>;
+    using coroutine_handle = std::coroutine_handle<promise_type>;
 
-    std::optional<T> result;
     std::exception_ptr exception;
-    std::coroutine_handle<> continuation;
+    coroutine_handle continuation;
 
-    Task get_return_object() { return Task(Handle::from_promise(*this)); }
+    /// @brief Returned when the coroutine encounters a `co_return`.
+    /// The `co_return` is desugared into `co_await promise.return_void`.
+    void return_void() {}
 
-    std::suspend_always initial_suspend() noexcept { return {}; }
-
-    auto final_suspend() noexcept {
-      struct FinalAwaiter : std::suspend_always {
-        void await_suspend(promise_type::Handle h) noexcept {
-          if (h.promise().continuation)
-            h.promise().continuation.resume();
-        }
-      };
-      return FinalAwaiter{};
+    auto get_return_object() {
+      return Task(coroutine_handle::from_promise(*this));
     }
 
-    void return_value(T value) noexcept { result = std::move(value); }
+    /// @brief Called IMMEDIATELY after the coroutine is initialized
+    auto initial_suspend() { return std::suspend_always{}; }
 
-    void unhandled_exception() noexcept {
-      exception = std::current_exception();
+    /// @brief Called IMMEDIATELY after the coroutine is done (i.e. co_return)
+    auto final_suspend() { return std::suspend_always{}; }
+
+    void unhandled_exception() {
+      // TODO: handle the exception
     }
   };
 
-  explicit Task(typename promise_type::Handle handle) : _handle(handle) {}
+  using coroutine_handle = Task::promise_type::coroutine_handle;
+  coroutine_handle handle_;
 
-  Task(const Task &task) = delete;
-  Task &operator=(const Task &) = delete;
+  Task() : handle_(nullptr) {}
 
-  Task(Task &&other) noexcept : _handle(other._handle) { other._handle = {}; }
-
-  Task &operator=(Task &&other) noexcept {
-    if (this == &other)
-      return *this;
-    if (_handle && !_handle.done())
-      _handle.destroy();
-    _handle = other._handle;
-    other._handle = {};
-    return *this;
-  }
-
-  ~Task() {
-    if (_handle)
-      _handle.destroy();
-  }
-
-  auto operator co_await() & = delete;
-
-  auto operator co_await() && noexcept {
-    struct Awaiter {
-      typename promise_type::Handle _handle;
-
-      bool await_ready() noexcept { return false; }
-
-      bool await_suspend(std::coroutine_handle<> handle) noexcept {
-        if (!_handle || _handle.done())
-          return false;
-
-        _handle.promise().continuation = handle;
-        spawn(_handle);
-        return true;
-      }
-
-      T await_resume() {
-        if (_handle.promise().exception)
-          std::rethrow_exception(_handle.promise().exception);
-        T tmp = *std::move(_handle.promise().result);
-        _handle.promise().result.reset();
-        return tmp;
-      }
-
-      ~Awaiter() {
-        if (_handle)
-          _handle.destroy();
-      }
-    };
-
-    return Awaiter{std::exchange(_handle, nullptr)};
-  }
-
-  T get() {
-    if (_handle.promise().exception)
-      std::rethrow_exception(_handle.promise().exception);
-    auto tmp = *std::move(_handle.promise().result);
-    _handle.promise().result.reset();
-    return tmp;
-  }
-
-  operator ErasedHandle() && {
-    auto tmp = std::exchange(_handle, nullptr);
-    return ErasedHandle(tmp);
-  }
-
-  typename promise_type::Handle _handle;
-};
-
-template <> struct Task<void> {
-  struct promise_type {
-    using Handle = std::coroutine_handle<promise_type>;
-    std::exception_ptr exception;
-    std::coroutine_handle<> continuation;
-
-    Task get_return_object() { return Task{Handle::from_promise(*this)}; }
-
-    std::suspend_always initial_suspend() noexcept { return {}; }
-
-    auto final_suspend() noexcept {
-      struct FinalAwaiter : std::suspend_always {
-        void await_suspend(promise_type::Handle h) noexcept {
-          if (h.promise().continuation)
-            h.promise().continuation.resume();
-        }
-      };
-      return FinalAwaiter{};
-    }
-
-    void return_void() noexcept {}
-
-    void unhandled_exception() noexcept {
-      exception = std::current_exception();
-    }
-  };
-
-  promise_type::Handle _handle;
-
-  using Handle = typename promise_type::Handle;
-
-  explicit Task(Handle _handle) : _handle(_handle) {}
+  Task(coroutine_handle handle) : handle_(handle) {}
   Task(const Task &) = delete;
-  Task &operator=(const Task &) = delete;
 
-  Task(Task &&o) noexcept : _handle(o._handle) { o._handle = nullptr; }
-  Task &operator=(Task &&other) noexcept {
+  Task(Task &&other) : handle_(other.handle_) { other.handle_ = nullptr; }
+  Task &operator=(Task &&other) {
     if (this == &other)
       return *this;
-    if (_handle && !_handle.done())
-      _handle.destroy();
-    _handle = other._handle;
-    other._handle = {};
+    handle_ = other.handle_;
+    other.handle_ = nullptr;
     return *this;
   }
 
-  ~Task() {
-    if (_handle)
-      _handle.destroy();
+  bool resume() {
+    if (!handle_.done())
+      handle_.resume();
+    return !handle_.done();
   }
 
-  auto operator co_await() & = delete;
+  bool done() { return handle_.done(); }
 
-  auto operator co_await() && noexcept {
-    struct Awaiter {
-      Handle _handle;
-      bool await_ready() noexcept { return false; }
+  auto operator co_await() noexcept {
+    struct awaiter {
+      coroutine_handle coro_;
 
-      bool await_suspend(std::coroutine_handle<> handle) noexcept {
-        if (!_handle || _handle.done())
-          return false;
-
-        _handle.promise().continuation = handle;
-        spawn(_handle);
-        return true;
-      }
-
-      void await_resume() {
-        if (_handle.promise().exception)
-          std::rethrow_exception(_handle.promise().exception);
-      }
-
-      ~Awaiter() {
-        if (_handle)
-          _handle.destroy();
-      }
+      bool await_ready() { return coro_.done(); };
+      void await_resume() {};
+      void await_suspend(coroutine_handle coro) {
+        // TODO: check if a continuation is already set
+        coro_.promise().continuation = coro;
+      };
     };
-    return Awaiter{std::exchange(_handle, nullptr)};
+
+    return awaiter{handle_};
   }
 
-  void get() {
-    if (_handle.promise().exception)
-      std::rethrow_exception(_handle.promise().exception);
-  }
+  /// @brief Assume that the coroutine will be magically rescheduled elsewhere.
+  /// Needed because C++ does not provide a direct ownerships mechanism, so when
+  /// something except the executor takes over the coro should not be destroyed.
+  void leak() { handle_ = nullptr; }
 
-  operator ErasedHandle() && {
-    return ErasedHandle(std::exchange(_handle, nullptr));
+  ~Task() {
+    if (handle_)
+      handle_.destroy();
   }
 };
-
-template <typename T> using Handle = typename Task<T>::promise_type::Handle;
 
 } // namespace toad
