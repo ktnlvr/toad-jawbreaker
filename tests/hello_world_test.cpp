@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include "tasks.hpp"
+
 TEST(TestTest, TruthTest) { EXPECT_TRUE(true); }
 
 int main(int argc, char **argv) {

@@ -31,11 +31,9 @@ int main(void) {
 
   Notify notify;
 
-  for (int i = 0; i < 100; i++) {
-    executor.spawn(worker1(notify));
-    executor.spawn(worker2(notify));
-    executor.spawn(producer(notify));
-  }
+  executor.spawn(worker1(notify));
+  executor.spawn(worker2(notify));
+  executor.spawn(producer(notify));
 
   notify.wait_blocking();
 

@@ -5,7 +5,7 @@ default:
 alias b := build
 build:
     mkdir -p build
-    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring -fsanitize=address
+    clang++ -g -Iinclude src/main.cpp -o ./build/main -std=c++2b -lspdlog -lfmt -g -luring -fsanitize=undefined
 
 run: build
     TSAN_OPTIONS="suppressions=./misc/tsan.suppressions" ./build/main
@@ -26,4 +26,4 @@ test: build-tests
 alias bt := build-tests
 build-tests:
     mkdir -p build
-    clang++ -g -Iinclude tests/hello_world_test.cpp -o ./build/tests -std=c++2b -lgtest -lgtest_main -lpthread
+    clang++ -g -Iinclude tests/hello_world_test.cpp -o ./build/tests -std=c++2b -lspdlog -lfmt -g -luring -lgtest -lgtest_main -lpthread -fsanitize=undefined
