@@ -40,12 +40,16 @@ struct Notify {
   }
 
   void wait_blocking() {
+    /// XXX(Artur): possible race condition. Entirely feasable for this to be
+    /// called before any awaiters have been registered or after they all have
+    /// been notified. Need to fix that.
     while (head.load(std::memory_order_acquire) != nullptr)
       std::this_thread::yield();
   }
 
   void push_awaiter_(Awaiter *awaiter) {
     Awaiter *old_head = head.load(std::memory_order_relaxed);
+
     do {
       awaiter->next = old_head;
     } while (!head.compare_exchange_weak(old_head, awaiter,
