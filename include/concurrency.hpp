@@ -2,6 +2,7 @@
 #include "concurrency/future.hpp"
 #include "concurrency/handle.hpp"
 #include "concurrency/iocontext.hpp"
+#include "concurrency/notify.hpp"
 #include "concurrency/pending.hpp"
 #include "concurrency/ring.hpp"
 #include "concurrency/task.hpp"

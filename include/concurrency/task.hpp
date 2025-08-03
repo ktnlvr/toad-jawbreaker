@@ -8,10 +8,6 @@
 
 namespace toad {
 
-struct Task;
-
-void spawn(Task &&task);
-
 struct Task {
   struct promise_type {
     using coroutine_handle = std::coroutine_handle<promise_type>;
@@ -31,7 +27,7 @@ struct Task {
     auto initial_suspend() { return std::suspend_always{}; }
 
     /// @brief Called IMMEDIATELY after the coroutine is done (i.e. co_return)
-    auto final_suspend() { return std::suspend_always{}; }
+    auto final_suspend() noexcept { return std::suspend_always{}; }
 
     void unhandled_exception() {
       // TODO: handle the exception
@@ -88,5 +84,7 @@ struct Task {
       handle_.destroy();
   }
 };
+
+using Handle = Task::coroutine_handle;
 
 } // namespace toad

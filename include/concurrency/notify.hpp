@@ -1,0 +1,59 @@
+#pragma once
+
+#include <atomic>
+#include <condition_variable>
+
+#include "executor.hpp"
+
+namespace toad {
+
+struct Notify {
+  struct Awaiter {
+    Notify &notify;
+    Awaiter *next = nullptr;
+    Handle continuation = nullptr;
+
+    bool await_ready() { return false; };
+    void await_resume() {};
+    void await_suspend(Handle handle) {
+      continuation = handle;
+      notify.push_awaiter_(this);
+    };
+
+    Awaiter(Notify &notify) : notify(notify) {}
+  };
+
+  std::atomic<Awaiter *> head;
+
+  Notify() : head(nullptr) {}
+
+  Notify(const Notify &other) = delete;
+  Notify(Notify &&other) = delete;
+
+  void notify_all() {
+    auto current = head.exchange(nullptr, std::memory_order_acquire);
+
+    while (current) {
+      spawn(Task(current->continuation));
+      current = current->next;
+    }
+  }
+
+  void wait_blocking() {
+    while (head.load(std::memory_order_acquire) != nullptr)
+      std::this_thread::yield();
+  }
+
+  void push_awaiter_(Awaiter *awaiter) {
+    Awaiter *old_head = head.load(std::memory_order_relaxed);
+    do {
+      awaiter->next = old_head;
+    } while (!head.compare_exchange_weak(old_head, awaiter,
+                                         std::memory_order_release,
+                                         std::memory_order_relaxed));
+  }
+
+  auto operator co_await() noexcept { return Awaiter(*this); }
+};
+
+} // namespace toad
