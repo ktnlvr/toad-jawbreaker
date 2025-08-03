@@ -59,6 +59,8 @@ template <typename T> struct Task {
       _handle.destroy();
   }
 
+  auto operator co_await() & = delete;
+
   auto operator co_await() && noexcept {
     struct Awaiter {
       typename promise_type::Handle _handle;
@@ -66,6 +68,9 @@ template <typename T> struct Task {
       bool await_ready() noexcept { return false; }
 
       bool await_suspend(std::coroutine_handle<> handle) noexcept {
+        if (!_handle || _handle.done())
+          return false;
+
         _handle.promise().continuation = handle;
         spawn(_handle);
         return true;
@@ -155,13 +160,20 @@ template <> struct Task<void> {
       _handle.destroy();
   }
 
+  auto operator co_await() & = delete;
+
   auto operator co_await() && noexcept {
     struct Awaiter {
       Handle _handle;
       bool await_ready() noexcept { return false; }
-      void await_suspend(std::coroutine_handle<> handle) noexcept {
+
+      bool await_suspend(std::coroutine_handle<> handle) noexcept {
+        if (!_handle || _handle.done())
+          return false;
+
         _handle.promise().continuation = handle;
         spawn(_handle);
+        return true;
       }
 
       void await_resume() {
