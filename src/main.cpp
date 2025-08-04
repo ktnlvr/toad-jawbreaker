@@ -1,5 +1,6 @@
 #include "concurrency/executor.hpp"
 #include "concurrency/future.hpp"
+#include "concurrency/join.hpp"
 #include "concurrency/notify.hpp"
 
 using namespace toad;
@@ -18,7 +19,7 @@ Task worker2(Notify &notify) {
 }
 
 Task long_worker() {
-  for (int i = 0; i < 50; i++) {
+  for (int i = 0; i < 5; i++) {
     spdlog::info("Working {}...", i);
     co_await suspend();
   }
@@ -42,9 +43,8 @@ int main(void) {
 
   Notify &notify = worker.notify_when_done();
 
-  executor.spawn(worker1(notify));
-  executor.spawn(worker2(notify));
   executor.spawn(std::move(worker));
+  join_blocking(worker1(notify), worker2(notify));
 
   notify.wait_blocking();
 
