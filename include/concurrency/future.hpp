@@ -19,7 +19,7 @@ template <typename T> struct FutureState {
 
   std::atomic<bool> is_ready = false;
   std::mutex _mutex = {};
-  ErasedHandle continuation = {};
+  Handle continuation = {};
 
   FutureState() : is_ready(false) {}
 
@@ -59,7 +59,7 @@ template <typename T> struct FutureHandle {
     ASSERT(did_set, "Attempt to set already-set future");
 
     new (&ptr->_value) T(std::move(value));
-    this_executor().spawn(std::move(ptr->continuation));
+    spawn(std::move(ptr->continuation));
   }
 };
 
@@ -87,12 +87,12 @@ template <typename T> struct Future {
 
   bool await_ready() noexcept { return _state->is_ready; }
 
-  bool await_suspend(std::coroutine_handle<> handle) noexcept {
+  bool await_suspend(Handle handle) noexcept {
     const std::lock_guard<std::mutex> guard(_state->_mutex);
     if (_state->is_ready.load(std::memory_order_acquire)) {
       return false;
     } else {
-      _state->continuation = ErasedHandle{handle};
+      _state->continuation = handle;
       return true;
     }
   }
