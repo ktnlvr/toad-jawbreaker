@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "executor.hpp"
+#include "notify.hpp"
 
 namespace toad {
 
@@ -13,7 +14,7 @@ struct Task {
     using coroutine_handle = std::coroutine_handle<promise_type>;
 
     std::exception_ptr exception;
-    coroutine_handle continuation;
+    Notify continuations;
 
     /// @brief Returned when the coroutine encounters a `co_return`.
     /// The `co_return` is desugared into `co_await promise.return_void`.
@@ -27,7 +28,10 @@ struct Task {
     auto initial_suspend() { return std::suspend_always{}; }
 
     /// @brief Called IMMEDIATELY after the coroutine is done (i.e. co_return)
-    auto final_suspend() noexcept { return std::suspend_always{}; }
+    auto final_suspend() noexcept {
+      continuations.notify_all();
+      return std::suspend_always{};
+    }
 
     void unhandled_exception() {
       // TODO: handle the exception
@@ -39,7 +43,8 @@ struct Task {
 
   Task() : handle_(nullptr) {}
 
-  Task(coroutine_handle handle) : handle_(handle) {}
+  explicit Task(coroutine_handle handle) : handle_(handle) {}
+
   Task(const Task &) = delete;
 
   Task(Task &&other) : handle_(other.handle_) { other.handle_ = nullptr; }
@@ -59,20 +64,7 @@ struct Task {
 
   bool done() { return handle_.done(); }
 
-  auto operator co_await() noexcept {
-    struct awaiter {
-      coroutine_handle coro_;
-
-      bool await_ready() { return coro_.done(); };
-      void await_resume() {};
-      void await_suspend(coroutine_handle coro) {
-        // TODO: check if a continuation is already set
-        coro_.promise().continuation = coro;
-      };
-    };
-
-    return awaiter{handle_};
-  }
+  auto &notify_when_done() { return handle_.promise().continuations; }
 
   /// @brief Assume that the coroutine will be magically rescheduled elsewhere.
   /// Needed because C++ does not provide a direct ownerships mechanism, so when

@@ -3,19 +3,19 @@
 #include <atomic>
 #include <condition_variable>
 
-#include "executor.hpp"
-
 namespace toad {
+
+void spawn(std::coroutine_handle<>);
 
 struct Notify {
   struct Awaiter {
     Notify &notify;
     Awaiter *next = nullptr;
-    Handle continuation = nullptr;
+    std::coroutine_handle<> continuation = nullptr;
 
     bool await_ready() { return false; };
     void await_resume() {};
-    void await_suspend(Handle handle) {
+    void await_suspend(std::coroutine_handle<> handle) {
       continuation = handle;
       notify.push_awaiter_(this);
     };
@@ -34,7 +34,7 @@ struct Notify {
     auto current = head.exchange(nullptr, std::memory_order_acquire);
 
     while (current) {
-      spawn(Task(current->continuation));
+      spawn(current->continuation);
       current = current->next;
     }
   }

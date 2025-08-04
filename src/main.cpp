@@ -17,12 +17,11 @@ Task worker2(Notify &notify) {
   spdlog::info("Worker 2! After notify");
 }
 
-Task producer(Notify &notify, FutureHandle<int> handle) {
-  spdlog::info("Producer Before notify");
-  notify.notify_all();
-  spdlog::info("Producer After notify");
-  handle.set_value(42);
-  co_return;
+Task long_worker() {
+  for (int i = 0; i < 50; i++) {
+    spdlog::info("Working {}...", i);
+    co_await suspend();
+  }
 }
 
 Task consumer(Future<int> future, Notify &notify) {
@@ -39,13 +38,13 @@ int main(void) {
 
   Executor executor;
 
-  Notify notify;
-  auto [fut, handle] = Future<int>::make_future();
+  auto worker = long_worker();
+
+  Notify &notify = worker.notify_when_done();
 
   executor.spawn(worker1(notify));
   executor.spawn(worker2(notify));
-  executor.spawn(producer(notify, handle));
-  executor.spawn(consumer(std::move(fut), notify));
+  executor.spawn(std::move(worker));
 
   notify.wait_blocking();
 
