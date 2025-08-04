@@ -29,6 +29,7 @@ struct Task {
 
     /// @brief Called IMMEDIATELY after the coroutine is done (i.e. co_return)
     auto final_suspend() noexcept {
+      spdlog::trace("Coroutine done");
       continuations.notify_all();
       return std::suspend_always{};
     }

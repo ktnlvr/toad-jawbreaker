@@ -13,7 +13,10 @@ struct Notify {
     Awaiter *next = nullptr;
     std::coroutine_handle<> continuation = nullptr;
 
-    bool await_ready() { return false; };
+    bool await_ready() noexcept {
+      return notify.fired.load(std::memory_order_acquire);
+    };
+
     void await_resume() {};
     void await_suspend(std::coroutine_handle<> handle) {
       continuation = handle;
@@ -24,13 +27,15 @@ struct Notify {
   };
 
   std::atomic<Awaiter *> head;
+  std::atomic<bool> fired{false};
 
-  Notify() : head(nullptr) {}
+  Notify() : head(nullptr), fired(false) {}
 
   Notify(const Notify &other) = delete;
   Notify(Notify &&other) = delete;
 
   void notify_all() {
+    fired.store(true, std::memory_order_release);
     auto current = head.exchange(nullptr, std::memory_order_acquire);
 
     while (current) {
@@ -40,10 +45,7 @@ struct Notify {
   }
 
   void wait_blocking() {
-    /// XXX(Artur): possible race condition. Entirely feasable for this to be
-    /// called before any awaiters have been registered or after they all have
-    /// been notified. Need to fix that.
-    while (head.load(std::memory_order_acquire) != nullptr)
+    while (!fired.load(std::memory_order_acquire))
       std::this_thread::yield();
   }
 
