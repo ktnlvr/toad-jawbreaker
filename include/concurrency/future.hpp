@@ -4,9 +4,11 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "executor.hpp"
+#include <variant>
 
 namespace toad {
 
@@ -104,5 +106,16 @@ template <typename T> struct Future {
     return moved_out;
   }
 };
+
+template <> struct Future<void> : Future<std::monostate> {};
+
+template <> struct FutureHandle<void> : FutureHandle<std::monostate> {
+  void set() { set_value(std::monostate()); }
+};
+
+template <typename T>
+static auto make_future() -> std::pair<Future<T>, FutureHandle<T>> {
+  return Future<T>::make_future();
+}
 
 } // namespace toad
