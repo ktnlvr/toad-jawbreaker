@@ -2,6 +2,7 @@
 #include "concurrency/future.hpp"
 #include "concurrency/join.hpp"
 #include "concurrency/notify.hpp"
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 using namespace toad;
 
@@ -34,8 +35,14 @@ Task consumer(Future<int> future, Notify &notify) {
 }
 
 int main(void) {
-  spdlog::set_level(spdlog::level::trace);
-  spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%L] [thread %t] %v");
+  auto formatter = std::make_unique<spdlog::pattern_formatter>();
+  formatter->add_flag<CorrelationIdFormatter>('Z');
+  formatter->set_pattern("%Y-%m-%d %H:%M:%S.%e [%L] [cid=%Z] [thread %t] %v");
+
+  auto logger = spdlog::stdout_color_mt("console");
+  logger->set_formatter(std::move(formatter));
+  logger->set_level(spdlog::level::trace);
+  spdlog::set_default_logger(logger);
 
   Executor executor(1);
 

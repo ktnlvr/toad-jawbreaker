@@ -40,6 +40,9 @@ struct Executor {
     void *addr = task.handle_.address();
     spdlog::debug("Spawning coroutine at address: {}", addr);
 
+    // Inherit whatever coroutine spawned it
+    task.set_parent_corr_id(thread_correlation_id_);
+
     if (task.done()) {
       spdlog::debug("Coroutine at {} already done, not spawning", addr);
       return;
@@ -88,6 +91,9 @@ struct Executor {
         _queue.pop_front();
       }
 
+      thread_parent_correlation_id_ = task.promise().parent_corr_id;
+      thread_correlation_id_ = task.promise().corr_id;
+
       if (!task.done()) {
         task.resume();
 
@@ -96,6 +102,9 @@ struct Executor {
         if (!task.done())
           task.leak();
       }
+
+      thread_correlation_id_ = 0;
+      thread_parent_correlation_id_ = 0;
     }
 
     _this_executor = nullptr;
