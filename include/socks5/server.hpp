@@ -120,10 +120,20 @@ struct Socks5Server {
 
     auto remote = std::move(maybe_remote_connection.value());
 
-    spdlog::info("Now transmitting!");
+    spdlog::info("Connection established!");
 
-    spawn(client_to_remote(client, remote));
-    spawn(remote_to_client(client, remote));
+    std::array<u8, 10> last_response = {0x05, 0x00, 0x00, 0x01, 127,
+                                        0,    0,    1,    0xB8, 22};
+    io.submit_write_some(client, std::span(last_response));
+
+    {
+      JoinSet join_set_;
+
+      join_set_.spawn(forward_connection_data_(client, remote));
+      join_set_.spawn(forward_connection_data_(remote, client));
+
+      co_await join_set_;
+    }
 
     spdlog::info("Transmission over!");
   }
@@ -137,13 +147,15 @@ struct Socks5Server {
     return io.submit_connect_ipv4(target, port);
   }
 
-  Task client_to_remote(const Socket &client, const Socket &remote) {
-    spdlog::info("Client -> Remote done");
-    co_return;
-  }
+  Task forward_connection_data_(const Socket &lhs, const Socket &rhs) {
+    IOContext &io = this_io_context();
 
-  Task remote_to_client(const Socket &client, const Socket &remote) {
-    spdlog::info("Remote -> Client done");
+    std::vector<u8> buffer;
+    while (true) {
+      co_await io.submit_read_some(lhs, buffer, 1024);
+      io.submit_write_some(rhs, std::span(buffer));
+    }
+
     co_return;
   }
 };

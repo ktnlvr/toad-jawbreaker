@@ -190,8 +190,13 @@ struct IOContext {
                        PendingReadSomeVec &read_some) {
     int client_fd = read_some.sockfd;
 
-    // TODO: check if the socket closed
     int read = cqe->res;
+    if (read < 0) {
+      // TODO: connection reset
+      if (read == -104)
+        return false;
+    }
+
     spdlog::info("Read {} bytes from client_fd={}", read, client_fd);
     read_some.vec.resize(read_some.initial_size + read);
 
