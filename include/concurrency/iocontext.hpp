@@ -12,6 +12,7 @@
 
 #include "../net/listener.hpp"
 #include "../net/socket.hpp"
+#include "../nic/ipv4.hpp"
 
 #include "future.hpp"
 #include "pending.hpp"

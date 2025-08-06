@@ -1,7 +1,7 @@
 #include "concurrency/executor.hpp"
 #include "concurrency/future.hpp"
-#include "concurrency/handle.hpp"
 #include "concurrency/iocontext.hpp"
+#include "concurrency/join.hpp"
 #include "concurrency/notify.hpp"
 #include "concurrency/pending.hpp"
 #include "concurrency/ring.hpp"

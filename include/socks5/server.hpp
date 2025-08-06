@@ -6,7 +6,7 @@
 namespace toad::socks5 {
 
 struct Socks5Server {
-  Task<void> serve_socks5() {
+  Task serve_socks5() {
     IOContext &io = this_io_context();
 
     auto listener = io.new_listener(1080);
@@ -19,7 +19,7 @@ struct Socks5Server {
     }
   }
 
-  Task<void> handle_client_handshake(Socket client) {
+  Task handle_client_handshake(Socket client) {
     IOContext &io = this_io_context();
 
     std::vector<u8> buffer;
@@ -137,12 +137,12 @@ struct Socks5Server {
     return io.submit_connect_ipv4(target, port);
   }
 
-  Task<void> client_to_remote(const Socket &client, const Socket &remote) {
+  Task client_to_remote(const Socket &client, const Socket &remote) {
     spdlog::info("Client -> Remote done");
     co_return;
   }
 
-  Task<void> remote_to_client(const Socket &client, const Socket &remote) {
+  Task remote_to_client(const Socket &client, const Socket &remote) {
     spdlog::info("Remote -> Client done");
     co_return;
   }
