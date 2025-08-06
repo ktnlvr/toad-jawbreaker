@@ -59,7 +59,7 @@ int main(void) {
   logger->set_level(spdlog::level::trace);
   spdlog::set_default_logger(logger);
 
-  Executor executor(1);
+  Executor executor;
 
   {
     JoinSet join_set_;
