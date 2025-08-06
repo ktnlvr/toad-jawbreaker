@@ -64,7 +64,7 @@ struct IOContext {
   /// @param listener
   /// @return The socket of a new freshly connected client
   Future<Socket> submit_accept_ipv4(const Listener &listener) {
-    auto [future, handle] = Future<Socket>::make_future();
+    auto [future, handle] = make_future<Socket>();
 
     // OPTIMIZE(Artur): maybe allocate these from some sort of ring/slab
     // allocator or hide the kind in the unused bits of the aligned ptr.
@@ -82,7 +82,7 @@ struct IOContext {
   /// @brief Generic handler for connecting a bare socket
   /// @returns
   Future<std::optional<Socket>> _submit_connect(struct sockaddr_in addr) {
-    auto [future, handle] = Future<std::optional<Socket>>::make_future();
+    auto [future, handle] = make_future<std::optional<Socket>>();
 
     int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
@@ -114,7 +114,7 @@ struct IOContext {
   Future<std::optional<Buffer>> submit_read_some(const Socket &socket,
                                                  sz max_size) {
     Buffer buffer(max_size);
-    auto [future, handle] = Future<std::optional<Buffer>>::make_future();
+    auto [future, handle] = make_future<std::optional<Buffer>>();
     PendingVariant *pending =
         new PendingVariant(PendingReadSome(socket._sockfd, buffer, handle));
 
@@ -127,7 +127,7 @@ struct IOContext {
 
   Future<sz> submit_read_some(const Socket &socket, std::vector<u8> &vec,
                               sz max_size) {
-    auto [future, handle] = Future<sz>::make_future();
+    auto [future, handle] = make_future<sz>();
 
     sz initial_size = vec.size();
     PendingVariant *pending = new PendingVariant(
