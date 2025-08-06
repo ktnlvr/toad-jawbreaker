@@ -9,25 +9,51 @@
 
 namespace toad {
 
-template <typename... Tasks> void join_blocking(Tasks... tasks) {
-  constexpr sz count = sizeof...(tasks);
-  std::array<Task, count> array = {std::move(tasks)...};
+/// @brief Basically an implementation of a Nursery
+/// https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/
+/// NOT THREAD SAFE.
+struct JoinSet {
+  std::atomic<u32> awaiting_ = 0;
+  std::vector<Notify *> notifies_ = {};
+  Notify notify = {};
 
-  std::latch done(count);
-  for (sz i = 0; i < count; i++) {
-    auto *notify = &array[i].notify_when_done();
-    spawn([notify, &done]() -> Task {
-      co_await *notify;
-      done.count_down();
-      spdlog::info("NOTIFIED!!!");
-    }());
+  std::condition_variable cv_;
+  std::mutex mu_;
+
+  void spawn(Task task) {
+    awaiting_.fetch_add(1, std::memory_order_seq_cst);
+
+    auto proc = [this](Task task) -> Task {
+      auto &awaiter = task.notify_when_done();
+      toad::spawn(std::move(task));
+      co_await awaiter;
+
+      if (awaiting_.fetch_sub(1, std::memory_order_seq_cst) == 1) {
+        notify.notify_all();
+        cv_.notify_one();
+      }
+    }(std::move(task));
+
+    toad::spawn(std::move(proc));
   }
 
-  for (sz i = 0; i < count; i++)
-    spawn(std::move(array[i]));
+  void wait_blocking() {
+    std::unique_lock lock_(mu_);
+    cv_.wait(lock_, [this]() { return awaiting_ == 0; });
+  }
 
-  done.wait();
-  spdlog::info("Join done!");
-}
+  // TODO: co await
+
+  JoinSet() {}
+
+  ~JoinSet() {
+    auto remaining = awaiting_.load(std::memory_order_seq_cst);
+    ASSERT(remaining == 0,
+           "JoinSet did not await all coroutines, {} remaining.", remaining);
+  }
+
+  JoinSet(const JoinSet &) = delete;
+  JoinSet(JoinSet &&) = delete;
+};
 
 } // namespace toad

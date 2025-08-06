@@ -46,14 +46,18 @@ int main(void) {
 
   Executor executor(1);
 
-  auto worker = long_worker();
+  {
+    JoinSet join_set_;
 
-  Notify &notify = worker.notify_when_done();
+    auto worker = long_worker();
+    Notify &notify = worker.notify_when_done();
 
-  executor.spawn(std::move(worker));
-  join_blocking(worker1(notify), worker2(notify));
+    join_set_.spawn(std::move(worker));
+    join_set_.spawn(worker1(notify));
+    join_set_.spawn(worker2(notify));
 
-  notify.wait_blocking();
+    join_set_.wait_blocking();
+  }
 
   return 0;
 }

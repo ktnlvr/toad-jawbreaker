@@ -9,7 +9,7 @@
 #define ASSERT(expr, msg, ...)                                                 \
   do {                                                                         \
     if (!(expr)) {                                                             \
-      spdlog::critical("Assertion " #expr " failed! {}:{}\t" msg, __FILE__,    \
+      spdlog::critical("Assertion `" #expr "` failed! {}:{}\t" msg, __FILE__,  \
                        __LINE__, ##__VA_ARGS__);                               \
       std::abort();                                                            \
     }                                                                          \

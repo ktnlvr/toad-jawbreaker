@@ -17,6 +17,7 @@ using correlation_id = u64;
 thread_local correlation_id thread_parent_correlation_id_ = 0;
 thread_local correlation_id thread_correlation_id_ = 0;
 
+/// @brief An owning handle to a coroutine that is not mid-execution
 struct Task {
   struct promise_type {
     using coroutine_handle = std::coroutine_handle<promise_type>;
@@ -45,7 +46,7 @@ struct Task {
     }
 
     void unhandled_exception() {
-      // TODO: handle the exception
+      std::rethrow_exception(std::current_exception());
     }
   };
 
@@ -57,11 +58,15 @@ struct Task {
   explicit Task(coroutine_handle handle) : handle_(handle) {}
 
   Task(const Task &) = delete;
+  Task &operator=(const Task &other) = delete;
 
   Task(Task &&other) : handle_(other.handle_) { other.handle_ = nullptr; }
   Task &operator=(Task &&other) {
     if (this == &other)
       return *this;
+
+    if (handle_)
+      handle_.destroy();
     handle_ = other.handle_;
     other.handle_ = nullptr;
     return *this;
@@ -73,11 +78,11 @@ struct Task {
     return !handle_.done();
   }
 
-  auto &promise() { return handle_.promise(); }
+  auto &promise() const { return handle_.promise(); }
 
-  bool done() { return handle_.done(); }
+  bool done() const { return handle_.done(); }
 
-  auto &notify_when_done() { return promise().continuations; }
+  auto &notify_when_done() const { return promise().continuations; }
 
   /// @brief Assume that the coroutine will be magically rescheduled elsewhere.
   /// Needed because C++ does not provide a direct ownerships mechanism, so when

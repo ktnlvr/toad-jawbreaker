@@ -111,7 +111,7 @@ struct Executor {
   }
 };
 
-void spawn(Task &&task) { this_executor().spawn(std::move(task)); }
+void spawn(Task task) { this_executor().spawn(std::move(task)); }
 
 void spawn(std::coroutine_handle<> coro) {
   spawn(Task(Handle::from_address(coro.address())));
