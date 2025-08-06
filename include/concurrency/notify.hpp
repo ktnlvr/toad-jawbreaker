@@ -61,6 +61,8 @@ struct Notify {
                                           std::memory_order_relaxed));
   }
 
+  bool done() const { return fired_.load(std::memory_order_acquire); }
+
   auto operator co_await() noexcept { return Awaiter(*this); }
 };
 

@@ -19,19 +19,34 @@ Task worker2(Notify &notify) {
   spdlog::info("Worker 2! After notify");
 }
 
+Task subworker(int i = 0) {
+  spdlog::info("Subworker hard at work...");
+  co_await suspend(i);
+  spdlog::info("Subworker done!");
+}
+
+Task worker3() {
+  spdlog::info("Worker 3 spawning subworkers...");
+
+  {
+    JoinSet join_set_;
+
+    for (int i = 0; i < 16; i++)
+      join_set_.spawn(subworker(i + 1));
+
+    co_await join_set_;
+  }
+
+  spdlog::info("Worker 3's subworkers done! Moving on...");
+
+  co_return;
+}
+
 Task long_worker() {
   for (int i = 0; i < 5; i++) {
     spdlog::info("Working {}...", i);
     co_await suspend();
   }
-}
-
-Task consumer(Future<int> future, Notify &notify) {
-  spdlog::info("Woke up the consumer!");
-  auto consumed = co_await future;
-  spdlog::info("Consumed value {}", consumed);
-  co_await notify;
-  spdlog::info("Awaiting for more...");
 }
 
 int main(void) {
@@ -55,6 +70,7 @@ int main(void) {
     join_set_.spawn(std::move(worker));
     join_set_.spawn(worker1(notify));
     join_set_.spawn(worker2(notify));
+    join_set_.spawn(worker3());
 
     join_set_.wait_blocking();
   }

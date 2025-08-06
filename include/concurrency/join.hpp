@@ -14,13 +14,14 @@ namespace toad {
 /// NOT THREAD SAFE.
 struct JoinSet {
   std::atomic<u32> awaiting_ = 0;
-  std::vector<Notify *> notifies_ = {};
   Notify notify = {};
 
   std::condition_variable cv_;
   std::mutex mu_;
 
   void spawn(Task task) {
+    ASSERT(!notify.done(), "The join must not have been joined previously");
+
     awaiting_.fetch_add(1, std::memory_order_seq_cst);
 
     auto proc = [this](Task task) -> Task {
@@ -42,7 +43,7 @@ struct JoinSet {
     cv_.wait(lock_, [this]() { return awaiting_ == 0; });
   }
 
-  // TODO: co await
+  auto operator co_await() { return notify.operator co_await(); }
 
   JoinSet() {}
 
