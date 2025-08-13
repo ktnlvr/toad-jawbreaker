@@ -1,7 +1,6 @@
 from time import sleep
 from lilypad import LilypadBase
 
-import asyncio
 import threading
 
 
@@ -14,15 +13,14 @@ def main():
     boris.init()
     colin.init()
 
-    alice.add_friend("boris", boris.static_public_key.public_bytes_raw())
-    alice.add_friend("colin", colin.static_public_key.public_bytes_raw())
-    boris.add_friend("alice", alice.static_public_key.public_bytes_raw())
-    boris.add_friend("colin", colin.static_public_key.public_bytes_raw())
-    colin.add_friend("alice", alice.static_public_key.public_bytes_raw())
-    colin.add_friend("boris", boris.static_public_key.public_bytes_raw())
+    alice.add_friend("boris", boris.pubkey)
+    alice.add_friend("colin", colin.pubkey)
+    boris.add_friend("alice", alice.pubkey)
+    boris.add_friend("colin", colin.pubkey)
+    colin.add_friend("alice", alice.pubkey)
+    colin.add_friend("boris", boris.pubkey)
 
     alice.add_friend_address("boris", "127.0.0.1")
-    alice.initiate_handshake("boris", "127.0.0.1", boris.port)
     boris.add_friend_address("alice", "127.0.0.1")
 
     threading.Thread(target=alice.run).start()
