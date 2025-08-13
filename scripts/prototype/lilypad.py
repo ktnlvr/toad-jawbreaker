@@ -3,22 +3,26 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from msgpack import dumps as pack
+from msgpack import dumps as pack, loads as unpack
 
 import os, base64, time
 import asyncio
 from dataclasses import dataclass, field
 
-from handshake import create_initiation
+from handshake import create_initiation, finish_handshake, respond_to_initiation
 
 
 @dataclass
 class FriendRecord:
     name: str
     expected_pubkey: bytes
-    ephemeral_pubkey: bytes = None
-    ephemeral_privkey: bytes = None
+    ephemeral_privkey: X25519PrivateKey
+
+    send_key: bytes = None
+    recv_key: bytes = None
+
     addresses: list[str] = field(default_factory=list)
+    handshake_established: bool = field(default=False)
 
 
 class LilypadBase:
@@ -32,6 +36,8 @@ class LilypadBase:
 
         self.friends: dict[str, FriendRecord] = {}
         self.whitelisted_ips = []
+
+        self.handlers = {}
 
     def handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         peername = writer.get_extra_info("peername")
@@ -59,18 +65,42 @@ class LilypadBase:
         print(f"{self.name}: bound to port {self.port}")
 
     def initiate_handshake(self, name, host, port):
-        print(f"{self.name}: Trying to handshake {name} at {host}:{port}")
+        print(f"{self.name}: trying to handshake {name} at {host}:{port}")
         friend = self.friends[name]
-        msg, ephemeral_privkey = create_initiation(
+        initiation, ephemeral_privkey = create_initiation(
             self.name, self.static_private_key, friend.expected_pubkey
         )
         friend.ephemeral_privkey = ephemeral_privkey
-        message = pack(msg)
-
-        self.datagram_send(message, host, port)
+        self.datagram_send({"kind": "handshake?", "payload": initiation}, host, port)
         print(f"{self.name}: initiation sent")
 
-    def datagram_send(self, msg: bytes, host: str, port: int):
+    def respond_to_handshake(
+        self, initiator_msg: dict, name: str, host: str, port: int
+    ):
+        friend = self.friends[name]
+
+        response, send_key, recv_key, ephemeral_private_key = respond_to_initiation(
+            self.name, self.static_private_key, initiator_msg
+        )
+
+        friend.recv_key = recv_key
+        friend.send_key = send_key
+        friend.ephemeral_privkey = ephemeral_private_key
+
+        self.datagram_send({"kind": "handshake!", "payload": response}, host, port)
+
+    def finalize_handshake(self, name: str, host: str, port: str):
+        friend = self.friends[name]
+        finish_handshake(
+            self.static_private_key,
+            friend.ephemeral_privkey,
+            friend.expected_pubkey,
+        )
+
+    def datagram_send(self, msg: bytes | dict, host: str, port: int):
+        if isinstance(msg, dict):
+            msg = pack(msg)
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.sendto(msg, (host, port))
 
@@ -79,6 +109,23 @@ class LilypadBase:
             data, addr = self.server.recvfrom(65535)
             ip, _ = addr
             if ip not in self.whitelisted_ips:
-                print(f"{self.name}: dropped packet from {addr}")
+                print(f"{self.name}: packet dropped, {addr} unknown")
                 continue
-            print(f"{self.name}: received {data}")
+
+            message = unpack(data)
+            print(f"{self.name}: received {message}")
+
+            if (kind := message.get("kind")) is None:
+                print(f"{self.name}: packet dropped, no kind specified")
+                continue
+
+            if (handler := self.handlers.get(kind)) is None:
+                print(
+                    f"{self.name}: packet dropped, no handler for kind `{kind}` found"
+                )
+                continue
+
+            if payload := message.get("payload"):
+                handler(payload)
+            else:
+                handler()
